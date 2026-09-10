@@ -371,7 +371,7 @@ function bankBadgeHTML(bankId, size, customBank){
   return `<div style="position:relative; width:${s}px;height:${s}px;border-radius:${radius}px;background:${b.color};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:${Math.round(s*0.34)}px;flex-shrink:0;overflow:hidden;">${initials}${logoImg}</div>`;
 }
 
-let state = { accounts: [], transactions: [], recurring: [], activeTab: 'dashboard', reportScope: 'todos', month: null, ready: false };
+let state = { accounts: [], transactions: [], recurring: [], activeTab: 'dashboard', reportScope: 'todos', month: null, ready: false, showMonthPicker: false };
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 
 function fmt(n){ return (Number(n)||0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'}); }
@@ -413,9 +413,32 @@ function shiftMonth(delta){ let m = state.month.m + delta; let y = state.month.y
 
 function monthSwitchHTML(){
   return `<div class="month-switch">
-    <div class="m-label">${MONTHS[state.month.m]} de ${state.month.y}</div>
+    <div class="m-label" onclick="toggleMonthPicker()" style="cursor:pointer;">${MONTHS[state.month.m]} de ${state.month.y} <span style="font-size:11px;color:var(--muted);">▾</span></div>
     <div class="m-btns"><button class="m-btn" onclick="shiftMonth(-1)">‹</button><button class="m-btn" onclick="shiftMonth(1)">›</button></div>
-  </div>`;
+  </div>
+  ${state.showMonthPicker ? `<div style="display:flex; gap:8px; margin:-10px 0 16px;">
+    <select id="mp-month" onchange="applyMonthPicker()" style="flex:1; min-height:40px; border:1px solid var(--edge); border-radius:10px; padding:8px; background:#F9FAFB; font-family:'Inter',sans-serif; color:var(--paper); font-size:13px;">
+      ${MONTHS.map((mn,i)=>`<option value="${i}" ${i===state.month.m?'selected':''}>${mn.charAt(0).toUpperCase()+mn.slice(1)}</option>`).join('')}
+    </select>
+    <select id="mp-year" onchange="applyMonthPicker()" style="width:96px; min-height:40px; border:1px solid var(--edge); border-radius:10px; padding:8px; background:#F9FAFB; font-family:'Inter',sans-serif; color:var(--paper); font-size:13px;">
+      ${yearOptionsHTML()}
+    </select>
+  </div>` : ''}`;
+}
+function yearOptionsHTML(){
+  const current = new Date().getFullYear();
+  const years = [];
+  for(let y=current-5; y<=current+1; y++) years.push(y);
+  if(!years.includes(state.month.y)) years.push(state.month.y);
+  years.sort((a,b)=>a-b);
+  return years.map(y=>`<option value="${y}" ${y===state.month.y?'selected':''}>${y}</option>`).join('');
+}
+function toggleMonthPicker(){ state.showMonthPicker = !state.showMonthPicker; render(); }
+function applyMonthPicker(){
+  const m = Number(document.getElementById('mp-month').value);
+  const y = Number(document.getElementById('mp-year').value);
+  state.month = {y, m};
+  render();
 }
 
 function flowTotals(list, type){
@@ -457,6 +480,25 @@ function financialTips(list){
   return tips.slice(0,4);
 }
 
+function txRowHTML(t, showScope){
+  const acc = state.accounts.find(a=>a.id===t.accountId);
+  const dateLabel = t.date ? t.date.split('-').reverse().slice(0,2).join('/') : '';
+  return `<div class="tx-item" onclick="openTxSheet('${t.scope}','${t.id}')">
+    <div class="tx-icon" style="background:${t.type==='entrada'?'var(--brand-light)':'var(--danger-light)'};color:${t.type==='entrada'?'var(--brand-dark)':'var(--danger)'};">${t.type==='entrada'?'↑':'↓'}</div>
+    <div class="tx-mid">
+      <div class="tx-cat">${catLabel(t.scope,t.type,t.category)}${showScope ? ` <span style="color:var(--muted);font-weight:400;">· ${t.scope==='empresa'?'Empresa':'Pessoal'}</span>` : ''}</div>
+      <div class="tx-meta">${dateLabel}${t.description ? ' · '+escHtml(t.description) : ''}${acc ? ' · '+escHtml(acc.name) : ''}</div>
+    </div>
+    <div class="tx-amt ${t.type==='entrada'?'in':'out'}">${t.type==='entrada'?'+':'−'} ${fmt(t.amount)}</div>
+  </div>`;
+}
+function renderTxList(list, showScope, limit){
+  const sorted = list.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||'') || 0);
+  const rows = limit ? sorted.slice(0, limit) : sorted;
+  if(!rows.length) return '<div class="empty" style="padding:16px 4px">Nenhum lançamento neste período.</div>';
+  return rows.map(t=>txRowHTML(t, showScope)).join('');
+}
+
 function renderFlowInsights(list){
   const tips = financialTips(list);
   return `<div class="section-title">Onde está seu dinheiro?</div>
@@ -493,6 +535,8 @@ function renderDashboard(){
         <div class="mini-card out"><div class="lbl">Saídas</div><div class="val">${fmt(sumBy(pesTx,'saida'))}</div></div>
       </div>
     </div>
+    <div class="section-title">Últimos lançamentos</div>
+    <div class="card">${renderTxList(mt, true, 6)}</div>
     ${renderFlowInsights(mt)}
   `;
 }
@@ -508,6 +552,8 @@ function renderScope(scope){
       <div class="mini-card out"><div class="lbl">Saídas</div><div class="val">${fmt(sumBy(mt,'saida'))}</div></div>
     </div>
     <button class="btn-primary ${scope}" onclick="openTxSheet('${scope}')">+ Novo lançamento</button>
+    <div class="section-title">Lançamentos <span class="tag">${mt.length}</span></div>
+    <div class="card">${renderTxList(mt, false)}</div>
     ${renderAccountsSection(scope)}
   `;
 }
@@ -596,6 +642,97 @@ function saveRecurringItem(){
 }
 function deleteRecurring(id){ if(!confirm('Excluir esta conta fixa?')) return; state.recurring=state.recurring.filter(r=>r.id!==id); saveRecurring(); render(); }
 
+/* ===== Painel de gráficos (SVG nativo, sem dependências externas) ===== */
+const CHART_PALETTE = ['#0A8754','#2ECC71','#0BA5A4','#3B82C4','#8E44AD','#E67E22','#F1C40F','#16A085','#EC407A','#6C757D'];
+function polarToCartesian(cx, cy, r, angleDeg){
+  const rad = (angleDeg - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+function svgDonut(data){
+  const size = 130;
+  const total = data.reduce((s,d)=>s+d.value,0);
+  const r = size/2 - 6, cx = size/2, cy = size/2, thickness = r*0.42;
+  let paths = '';
+  if(!total){
+    paths = `<circle cx="${cx}" cy="${cy}" r="${r-thickness/2}" fill="none" stroke="#EEF2F6" stroke-width="${thickness}"></circle>`;
+  } else {
+    let angleStart = 0;
+    data.forEach(d=>{
+      const angle = (d.value/total) * 360;
+      if(angle <= 0) return;
+      const angleEnd = Math.min(angleStart + angle, 359.99);
+      const largeArc = angle > 180 ? 1 : 0;
+      const p1 = polarToCartesian(cx,cy,r,angleStart);
+      const p2 = polarToCartesian(cx,cy,r,angleEnd);
+      const p3 = polarToCartesian(cx,cy,r-thickness,angleEnd);
+      const p4 = polarToCartesian(cx,cy,r-thickness,angleStart);
+      paths += `<path d="M ${p1.x} ${p1.y} A ${r} ${r} 0 ${largeArc} 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${r-thickness} ${r-thickness} 0 ${largeArc} 0 ${p4.x} ${p4.y} Z" fill="${d.color}"></path>`;
+      angleStart += angle;
+    });
+  }
+  return `<svg viewBox="0 0 ${size} ${size}" style="width:100%; max-width:150px; height:auto; display:block; margin:0 auto;">${paths}</svg>`;
+}
+function donutLegendHTML(data){
+  if(!data.length) return '<div class="empty" style="padding:8px 0">Sem dados neste período.</div>';
+  return data.map(d=>`<div style="display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--paper); margin-bottom:5px;">
+    <span style="width:8px; height:8px; border-radius:2px; background:${d.color}; display:inline-block; flex-shrink:0;"></span>
+    <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(d.label)}</span>
+    <span style="color:var(--muted); font-weight:600; flex-shrink:0;">${fmt(d.value)}</span>
+  </div>`).join('');
+}
+function lastNMonths(n){
+  const arr = []; let y = state.month.y, m = state.month.m;
+  for(let i=n-1;i>=0;i--){ let yy=y, mm=m-i; while(mm<0){ mm+=12; yy--; } arr.push({y:yy, m:mm}); }
+  return arr;
+}
+function svgBarCompare(monthsData){
+  const w = 300, h = 170, padBottom = 22, padTop = 12, padSide = 6;
+  const maxVal = Math.max(1, ...monthsData.flatMap(d=>[d.entradas, d.saidas]));
+  const groupW = (w - padSide*2) / monthsData.length;
+  const barW = Math.max(4, groupW/2 - 5);
+  const usableH = h - padBottom - padTop;
+  let bars = '';
+  monthsData.forEach((d,i)=>{
+    const gx = padSide + i*groupW;
+    const hEnt = (d.entradas/maxVal) * usableH;
+    const hSai = (d.saidas/maxVal) * usableH;
+    bars += `<rect x="${gx + groupW/2 - barW - 2}" y="${h-padBottom-hEnt}" width="${barW}" height="${hEnt}" rx="3" fill="#0A8754"></rect>`;
+    bars += `<rect x="${gx + groupW/2 + 2}" y="${h-padBottom-hSai}" width="${barW}" height="${hSai}" rx="3" fill="#E53935"></rect>`;
+    bars += `<text x="${gx + groupW/2}" y="${h-7}" font-size="9" fill="#6C757D" text-anchor="middle" font-family="Inter,sans-serif">${escHtml(d.label)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; display:block;">${bars}</svg>`;
+}
+function renderPanel(scope){
+  const months = lastNMonths(6);
+  const monthsData = months.map(({y,m})=>{
+    const list = state.transactions.filter(t => (!scope || t.scope===scope) && txInMonth(t,y,m));
+    return { label: MONTHS[m].slice(0,3), entradas: sumBy(list,'entrada'), saidas: sumBy(list,'saida') };
+  });
+  const mt = monthTx().filter(t=>!scope || t.scope===scope);
+  const entCats = reportCategories(mt, 'entrada').slice(0,6);
+  const saiCats = reportCategories(mt, 'saida').slice(0,6);
+  const toChartData = (cats, type) => cats.map(([key,val],i)=>{
+    const source = mt.find(t=>t.category===key && t.type===type);
+    return { label: catLabel(source ? source.scope : (scope || 'empresa'), type, key), value: val, color: CHART_PALETTE[i%CHART_PALETTE.length] };
+  });
+  const entData = toChartData(entCats,'entrada');
+  const saiData = toChartData(saiCats,'saida');
+  return `
+    <div class="section-title" style="margin-top:0">Painel — evolução (6 meses)</div>
+    <div class="card">
+      ${svgBarCompare(monthsData)}
+      <div style="display:flex; gap:16px; justify-content:center; margin-top:6px; font-size:11px;">
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:9px; height:9px; border-radius:2px; background:#0A8754; display:inline-block;"></span>Entradas</span>
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:9px; height:9px; border-radius:2px; background:#E53935; display:inline-block;"></span>Saídas</span>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:14px; align-items:start;">
+      <div class="card"><h4 style="font-size:12px; margin:0 0 10px; font-weight:700; color:var(--paper);">Entradas por categoria</h4>${svgDonut(entData)}<div style="margin-top:10px;">${donutLegendHTML(entData)}</div></div>
+      <div class="card"><h4 style="font-size:12px; margin:0 0 10px; font-weight:700; color:var(--paper);">Saídas por categoria</h4>${svgDonut(saiData)}<div style="margin-top:10px;">${donutLegendHTML(saiData)}</div></div>
+    </div>
+  `;
+}
+
 function reportCategories(list, type){
   const totals = {};
   list.filter(t=>t.type===type).forEach(t=>{
@@ -639,7 +776,8 @@ function renderReports(){
       <button class="${state.reportScope==='empresa'?'active':''}" onclick="setReportScope('empresa')">Empresa</button>
       <button class="${state.reportScope==='pessoal'?'active':''}" onclick="setReportScope('pessoal')">Pessoal</button>
     </div>
-    <div class="section-title" style="margin-top:0">Resumo — ${scopeLabel}</div>
+    ${renderPanel(state.reportScope==='todos' ? null : state.reportScope)}
+    <div class="section-title">Resumo — ${scopeLabel}</div>
     <div class="report-summary">
       <div class="report-card in"><div class="lbl">Entradas</div><div class="val">${fmt(entradas)}</div></div>
       <div class="report-card out"><div class="lbl">Saídas</div><div class="val">${fmt(saidas)}</div></div>
@@ -695,8 +833,9 @@ function closeSheet(){ document.getElementById('overlay').classList.remove('show
 function openSheetHTML(html){ document.getElementById('sheet').innerHTML = `<div class="sheet-handle"></div>` + html; document.getElementById('overlay').classList.add('show'); }
 
 let txDraft = null;
-function openTxSheet(scope){
-  txDraft = { id: uid(), scope, type:'entrada', category: CATS[scope].entrada[0].k, amount:'', date: todayISO(), accountId: '', description:'' };
+function openTxSheet(scope, id){
+  const existing = id ? state.transactions.find(t=>t.id===id) : null;
+  txDraft = existing ? {...existing} : { id: uid(), scope, type:'entrada', category: CATS[scope].entrada[0].k, amount:'', date: todayISO(), accountId: '', description:'' };
   renderTxSheet();
 }
 function setTxType(type){
@@ -708,8 +847,9 @@ function setTxCategory(value){ txDraft.category = value; }
 function renderTxSheet(){
   const cats = CATS[txDraft.scope][txDraft.type];
   const accounts = state.accounts.filter(a=>txDraft.scope==='pessoal' ? a.type==='pessoal' : a.type!=='pessoal');
+  const isEdit = state.transactions.some(t=>t.id===txDraft.id);
   const html = `
-    <h3>Novo lançamento — ${txDraft.scope==='empresa'?'Empresa':'Pessoal'}</h3>
+    <h3>${isEdit ? 'Editar' : 'Novo'} lançamento — ${txDraft.scope==='empresa'?'Empresa':'Pessoal'}</h3>
     <div class="toggle-row">
       <button class="toggle-opt ${txDraft.type==='entrada'?'sel-in':''}" onclick="setTxType('entrada')">Entrada</button>
       <button class="toggle-opt ${txDraft.type==='saida'?'sel-out':''}" onclick="setTxType('saida')">Saída</button>
@@ -717,19 +857,27 @@ function renderTxSheet(){
     <div class="field"><label>Categoria</label><select onchange="setTxCategory(this.value)">${cats.map(c=>`<option value="${c.k}" ${c.k===txDraft.category?'selected':''}>${c.l}</option>`).join('')}</select></div>
     <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" min="0" id="tx-amt" value="${txDraft.amount}" oninput="txDraft.amount=this.value" placeholder="0,00"></div>
     <div class="field"><label>Data</label><input type="date" value="${txDraft.date}" onchange="txDraft.date=this.value"></div>
-    <div class="field"><label>Descrição (opcional)</label><input type="text" maxlength="80" value="${txDraft.description}" oninput="txDraft.description=this.value" placeholder="Ex.: Uber para reunião"></div>
-    <div class="field"><label>Conta (opcional)</label><select onchange="txDraft.accountId=this.value"><option value="">Sem conta vinculada</option>${accounts.map(a=>`<option value="${a.id}" ${a.id===txDraft.accountId?'selected':''}>${a.name}</option>`).join('')}</select></div>
+    <div class="field"><label>Descrição (opcional)</label><input type="text" maxlength="80" value="${escHtml(txDraft.description)}" oninput="txDraft.description=this.value" placeholder="Ex.: Uber para reunião"></div>
+    <div class="field"><label>Conta (opcional)</label><select onchange="txDraft.accountId=this.value"><option value="">Sem conta vinculada</option>${accounts.map(a=>`<option value="${a.id}" ${a.id===txDraft.accountId?'selected':''}>${escHtml(a.name)}</option>`).join('')}</select></div>
     <div class="sheet-actions">
       <button class="btn ghost" onclick="closeSheet()">Cancelar</button>
       <button class="btn save" onclick="saveTx()">Salvar</button>
     </div>
+    ${isEdit ? `<button class="btn danger" style="width:100%; margin-top:10px;" onclick="deleteTx('${txDraft.id}')">Excluir lançamento</button>` : ''}
   `;
   openSheetHTML(html);
 }
 function saveTx(){
   if(!txDraft.amount || Number(txDraft.amount)<=0){ alert('Valor inválido.'); return; }
   if(!txDraft.date){ alert('Informe a data.'); return; }
-  state.transactions.push({...txDraft, amount: Number(txDraft.amount)});
+  const payload = {...txDraft, amount: Number(txDraft.amount)};
+  const idx = state.transactions.findIndex(t=>t.id===payload.id);
+  if(idx>=0) state.transactions[idx] = payload; else state.transactions.push(payload);
+  saveTransactions(); closeSheet(); render();
+}
+function deleteTx(id){
+  if(!confirm('Excluir este lançamento?')) return;
+  state.transactions = state.transactions.filter(t=>t.id!==id);
   saveTransactions(); closeSheet(); render();
 }
 
@@ -887,6 +1035,92 @@ function parseCSV(text){
   return rows;
 }
 
+/* ===== Leitura de extrato em PDF (via PDF.js, carregado sob demanda) ===== */
+const PDFJS_VERSION = '3.11.174';
+let pdfJsLoadPromise = null;
+function ensurePdfJsLoaded(){
+  if(window.pdfjsLib) return Promise.resolve();
+  if(pdfJsLoadPromise) return pdfJsLoadPromise;
+  pdfJsLoadPromise = new Promise((resolve, reject)=>{
+    const script = document.createElement('script');
+    script.src = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.js`;
+    script.onload = () => {
+      if(window.pdfjsLib){
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`;
+        resolve();
+      } else {
+        pdfJsLoadPromise = null;
+        reject(new Error('Leitor de PDF indisponível.'));
+      }
+    };
+    script.onerror = () => { pdfJsLoadPromise = null; reject(new Error('Não foi possível carregar o leitor de PDF. Verifique sua internet.')); };
+    document.head.appendChild(script);
+  });
+  return pdfJsLoadPromise;
+}
+// Agrupa os itens de texto de uma página (cada um com posição x/y) em linhas,
+// já que o PDF não guarda quebras de linha — reconstruímos pela proximidade vertical.
+function groupTextItemsIntoLines(items){
+  const sorted = items.slice().sort((a,b)=> b.y - a.y || a.x - b.x);
+  const lines = []; let curY = null, curLine = [];
+  const yTol = 2.5;
+  sorted.forEach(it=>{
+    if(curY===null || Math.abs(it.y-curY) > yTol){
+      if(curLine.length) lines.push(curLine.map(w=>w.str).join(' '));
+      curLine = [it]; curY = it.y;
+    } else { curLine.push(it); }
+  });
+  if(curLine.length) lines.push(curLine.map(w=>w.str).join(' '));
+  return lines;
+}
+async function extractPDFText(typedArray){
+  const pdf = await window.pdfjsLib.getDocument({ data: typedArray }).promise;
+  let fullText = '';
+  for(let i=1;i<=pdf.numPages;i++){
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const items = content.items.map(it=>({ str: it.str, x: it.transform[4], y: it.transform[5] }));
+    fullText += groupTextItemsIntoLines(items).join('\n') + '\n';
+  }
+  return fullText;
+}
+// Extração heurística: procura linhas que comecem com uma data e contenham valor(es) monetário(s).
+// Extratos em PDF variam muito de layout — por isso cada lançamento extraído vem para revisão manual.
+function parsePDFStatement(text){
+  const lines = text.split(/\n+/).map(l=>l.trim()).filter(Boolean);
+  const dateRe = /^(\d{2}\/\d{2}\/\d{4}|\d{2}\/\d{2}\/\d{2})\b\s*/;
+  const moneyRe = /-?R?\$?\s?\d{1,3}(?:\.\d{3})*,\d{2}\s?-?/g;
+  const rows = [];
+  lines.forEach(line=>{
+    const dm = line.match(dateRe);
+    if(!dm) return;
+    const rest = line.slice(dm[0].length);
+    const moneyMatches = rest.match(moneyRe);
+    if(!moneyMatches || !moneyMatches.length) return;
+    // quando há 2+ valores na linha, assume-se o padrão "valor da transação" seguido de "saldo"
+    const chosenIdx = moneyMatches.length >= 2 ? moneyMatches.length - 2 : 0;
+    const amtRaw = moneyMatches[chosenIdx];
+    let amount = parseAmountStr(amtRaw.replace(/-\s*$/,''));
+    if(isNaN(amount) || amount === 0) return;
+    let uncertain = true;
+    if(/-\s*$/.test(amtRaw) || /^\s*-/.test(amtRaw)){
+      amount = -Math.abs(amount); uncertain = false;
+    } else {
+      const idx = rest.lastIndexOf(amtRaw);
+      const tail = rest.slice(idx + amtRaw.length, idx + amtRaw.length + 2);
+      if(/^\s*D/i.test(tail)){ amount = -Math.abs(amount); uncertain = false; }
+      else if(/^\s*C/i.test(tail)){ amount = Math.abs(amount); uncertain = false; }
+      else { amount = -Math.abs(amount); } // sem indicação clara: assume saída, mas marca como incerto para revisão
+    }
+    const firstMoneyPos = rest.indexOf(moneyMatches[0]);
+    let description = rest.slice(0, firstMoneyPos).trim().replace(/\s{2,}/g,' ');
+    if(!description) description = 'Transação importada';
+    const date = parseBRDate(dm[1]);
+    if(date) rows.push({ date, description, amount, uncertain });
+  });
+  return rows;
+}
+
 let importDraft = null;
 function openImportSheet(){ importDraft = { scope:'empresa', accountId:'', rows:null, fileName:'' }; renderImportStep1(); }
 function setImportScope(scope){ importDraft.scope = scope; importDraft.accountId=''; renderImportStep1(); }
@@ -894,7 +1128,7 @@ function renderImportStep1(){
   const accounts = state.accounts.filter(a=> importDraft.scope==='pessoal' ? a.type==='pessoal' : a.type!=='pessoal');
   const html = `
     <h3>Importar extrato bancário</h3>
-    <p class="hint" style="font-size:12px;color:var(--muted);line-height:1.5;margin:-8px 0 16px">Envie o extrato exportado do seu banco em formato <b>OFX</b> (recomendado) ou <b>CSV</b>. Você vai revisar cada lançamento antes de confirmar — nada é importado automaticamente.</p>
+    <p class="hint" style="font-size:12px;color:var(--muted);line-height:1.5;margin:-8px 0 16px">Envie o extrato exportado do seu banco em formato <b>OFX</b> (recomendado), <b>CSV</b> ou <b>PDF</b>. Você vai revisar cada lançamento antes de confirmar — nada é importado automaticamente.<br><br>A leitura de PDF é experimental: funciona só com PDFs gerados digitalmente pelo banco (não fotos ou digitalizações) e a primeira vez que você usar essa opção precisa de internet para carregar o leitor.</p>
     <div class="toggle-row">
       <button class="toggle-opt ${importDraft.scope==='empresa'?'sel-in':''}" onclick="setImportScope('empresa')">Empresa</button>
       <button class="toggle-opt ${importDraft.scope==='pessoal'?'sel-pessoal':''}" onclick="setImportScope('pessoal')">Pessoal</button>
@@ -903,19 +1137,57 @@ function renderImportStep1(){
       <option value="">Sem conta vinculada</option>
       ${accounts.map(a=>`<option value="${a.id}" ${a.id===importDraft.accountId?'selected':''}>${escHtml(a.name)}</option>`).join('')}
     </select></div>
-    <div class="field"><label>Arquivo do extrato (.ofx ou .csv)</label>
-      <input type="file" accept=".ofx,.csv,text/csv,application/x-ofx" onchange="handleImportFile(event)">
+    <div class="field"><label>Arquivo do extrato (.ofx, .csv ou .pdf)</label>
+      <input type="file" accept=".ofx,.csv,text/csv,application/x-ofx,.pdf,application/pdf" onchange="handleImportFile(event)">
     </div>
     <div id="import-file-status" style="font-size:12px;color:var(--muted);margin:-6px 0 4px;"></div>
     <div class="sheet-actions"><button class="btn ghost" onclick="closeSheet()">Cancelar</button></div>
   `;
   openSheetHTML(html);
 }
+function finishParsedImport(parsed, status){
+  if(!parsed.length){ if(status) status.textContent = 'Não foi possível identificar lançamentos neste arquivo. Verifique o formato.'; return; }
+  importDraft.rows = parsed.map(r=>{
+    const type = r.amount >= 0 ? 'entrada' : 'saida';
+    const amount = Math.abs(r.amount);
+    const isDup = state.transactions.some(t=> t.scope===importDraft.scope && t.date===r.date && Math.abs(Number(t.amount)-amount)<0.005 && (t.description||'').trim().toLowerCase()===(r.description||'').trim().toLowerCase());
+    return { date: r.date, description: r.description, amount, type, category: guessCategory(importDraft.scope, type, r.description), checked: !isDup, dup: isDup, uncertain: !!r.uncertain };
+  });
+  renderImportPreview();
+}
 function handleImportFile(evt){
   const file = evt.target.files && evt.target.files[0];
   if(!file) return;
   importDraft.fileName = file.name;
   const status = document.getElementById('import-file-status');
+  const isPDF = /\.pdf$/i.test(file.name) || file.type==='application/pdf';
+
+  if(isPDF){
+    if(status) status.textContent = 'Carregando leitor de PDF (é necessário internet na primeira vez)...';
+    ensurePdfJsLoaded().then(()=>{
+      if(status) status.textContent = 'Lendo PDF...';
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try{
+          const typedArray = new Uint8Array(reader.result);
+          const text = await extractPDFText(typedArray);
+          if(!text || !text.trim()){
+            if(status) status.textContent = 'Não conseguimos extrair texto deste PDF — ele pode ser uma imagem digitalizada. Tente exportar o extrato como OFX ou CSV no app do banco.';
+            return;
+          }
+          const parsed = parsePDFStatement(text);
+          finishParsedImport(parsed, status);
+        }catch(e){
+          if(status) status.textContent = 'Não foi possível ler este PDF (pode estar protegido por senha). Tente outro arquivo ou use OFX/CSV.';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }).catch(err=>{
+      if(status) status.textContent = (err && err.message) || 'Não foi possível carregar o leitor de PDF. Verifique sua internet ou use OFX/CSV.';
+    });
+    return;
+  }
+
   if(status) status.textContent = 'Lendo arquivo...';
   const reader = new FileReader();
   reader.onload = () => {
@@ -923,14 +1195,7 @@ function handleImportFile(evt){
       const text = reader.result;
       const isOFX = /\.ofx$/i.test(file.name) || /<OFX>|OFXHEADER/i.test(text);
       const parsed = isOFX ? parseOFX(text) : parseCSV(text);
-      if(!parsed.length){ if(status) status.textContent = 'Não foi possível identificar lançamentos neste arquivo. Verifique o formato.'; return; }
-      importDraft.rows = parsed.map(r=>{
-        const type = r.amount >= 0 ? 'entrada' : 'saida';
-        const amount = Math.abs(r.amount);
-        const isDup = state.transactions.some(t=> t.scope===importDraft.scope && t.date===r.date && Math.abs(Number(t.amount)-amount)<0.005 && (t.description||'').trim().toLowerCase()===(r.description||'').trim().toLowerCase());
-        return { date: r.date, description: r.description, amount, type, category: guessCategory(importDraft.scope, type, r.description), checked: !isDup, dup: isDup };
-      });
-      renderImportPreview();
+      finishParsedImport(parsed, status);
     }catch(e){ if(status) status.textContent = 'Erro ao ler o arquivo. Tente outro formato.'; }
   };
   reader.readAsText(file, 'UTF-8');
@@ -962,6 +1227,7 @@ function renderImportPreview(){
               <input type="number" step="0.01" min="0" value="${r.amount}" oninput="importDraft.rows[${i}].amount=this.value" style="width:96px; min-height:36px; padding:6px 8px; font-size:11.5px; border:1px solid var(--edge); border-radius:8px; background:#F9FAFB;">
             </div>
             ${r.dup ? '<div style="font-size:10px;color:var(--danger);margin-top:5px;">Possível duplicado — já existe um lançamento parecido</div>' : ''}
+            ${r.uncertain ? '<div style="font-size:10px;color:#B26A00;margin-top:5px;">Não identificamos com certeza se é entrada ou saída neste PDF — confira o tipo acima</div>' : ''}
           </div>
         </div>`).join('')}
     </div>
