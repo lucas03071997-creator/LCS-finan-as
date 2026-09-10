@@ -265,6 +265,9 @@
       </div>
     </div>
     <div class="topbar-right">
+      <button class="icon-circle" id="importBtn" onclick="openImportSheet()" title="Importar extrato do banco">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7.5 9.5L12 5l4.5 4.5"/><path d="M4.5 16.5v2a2 2 0 002 2h11a2 2 0 002-2v-2"/></svg>
+      </button>
       <button class="icon-circle" id="eyeToggle" onclick="toggleBalances()">
         <svg viewBox="0 0 24 24" id="eyeIcon"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
@@ -322,6 +325,51 @@ const CATS = {
     saida: [{k:'moradia', l:'Moradia'},{k:'alimentacao', l:'Alimentação'},{k:'supermercado', l:'Supermercado'},{k:'transporte', l:'Transporte / Uber'},{k:'saude', l:'Saúde'},{k:'educacao', l:'Educação'},{k:'lazer', l:'Lazer'},{k:'familia', l:'Família e filhos'},{k:'vestuario', l:'Vestuário'},{k:'contas', l:'Contas e assinaturas'},{k:'emprestimo_pagamento', l:'Pagamento de empréstimo'},{k:'cartao', l:'Cartão de crédito'},{k:'outras_saidas', l:'Outras saídas pessoais'}]
   }
 };
+
+const BANKS = [
+  {id:'nubank', name:'Nubank', color:'#8A05BE', initials:'NU'},
+  {id:'itau', name:'Itaú', color:'#EC7000', initials:'IT'},
+  {id:'bradesco', name:'Bradesco', color:'#CC092F', initials:'BR'},
+  {id:'bb', name:'Banco do Brasil', color:'#003399', initials:'BB'},
+  {id:'caixa', name:'Caixa Econômica', color:'#0033A0', initials:'CX'},
+  {id:'santander', name:'Santander', color:'#EC0000', initials:'SA'},
+  {id:'inter', name:'Banco Inter', color:'#FF7A00', initials:'IN'},
+  {id:'c6', name:'C6 Bank', color:'#1B1B1B', initials:'C6'},
+  {id:'btg', name:'BTG Pactual', color:'#002B5C', initials:'BTG'},
+  {id:'original', name:'Banco Original', color:'#00A868', initials:'OR'},
+  {id:'neon', name:'Neon', color:'#00B5AD', initials:'NE'},
+  {id:'sicoob', name:'Sicoob', color:'#00A651', initials:'SB'},
+  {id:'sicredi', name:'Sicredi', color:'#7AB800', initials:'SI'},
+  {id:'pagbank', name:'PagBank', color:'#00A868', initials:'PB'},
+  {id:'mercadopago', name:'Mercado Pago', color:'#00AEEF', initials:'MP'},
+  {id:'stone', name:'Stone', color:'#00C060', initials:'SN'},
+  {id:'cora', name:'Cora', color:'#232323', initials:'CR'},
+  {id:'asaas', name:'Asaas', color:'#00C48C', initials:'AS'},
+  {id:'xp', name:'XP Investimentos', color:'#000000', initials:'XP'},
+  {id:'safra', name:'Banco Safra', color:'#003865', initials:'SF'},
+  {id:'outro', name:'Outro banco', color:'#6C757D', initials:'?'}
+];
+const BANK_DOMAINS = {
+  nubank:'nubank.com.br', itau:'itau.com.br', bradesco:'bradesco.com.br', bb:'bb.com.br',
+  caixa:'caixa.gov.br', santander:'santander.com.br', inter:'bancointer.com.br', c6:'c6bank.com.br',
+  btg:'btgpactual.com', original:'original.com.br', neon:'neon.com.br', sicoob:'sicoob.com.br',
+  sicredi:'sicredi.com.br', pagbank:'pagbank.com.br', mercadopago:'mercadopago.com.br', stone:'stone.com.br',
+  cora:'cora.com.br', asaas:'asaas.com', xp:'xpi.com.br', safra:'safra.com.br'
+};
+function bankById(id){ return BANKS.find(b=>b.id===id) || BANKS[BANKS.length-1]; }
+function bankDisplayName(acc){ if(!acc) return ''; return acc.bankId==='outro' ? (acc.customBank || 'Outro banco') : bankById(acc.bankId).name; }
+function bankBadgeHTML(bankId, size, customBank){
+  const b = bankById(bankId);
+  const s = size || 36;
+  let initials = b.initials;
+  if(bankId==='outro' && customBank && customBank.trim()) initials = customBank.trim().slice(0,2).toUpperCase();
+  const radius = Math.round(s*0.28);
+  const domain = BANK_DOMAINS[bankId];
+  // Tenta carregar a logo oficial do banco (via serviço público de logos por domínio);
+  // se falhar (sem internet, ou banco não coberto), remove a imagem e mantém o badge colorido com a sigla.
+  const logoImg = domain ? `<img src="https://logo.clearbit.com/${domain}?size=${s*2}" alt="" style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#fff; border-radius:${radius}px; padding:${Math.max(2,Math.round(s*0.1))}px;" onerror="this.remove()" loading="lazy">` : '';
+  return `<div style="position:relative; width:${s}px;height:${s}px;border-radius:${radius}px;background:${b.color};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:${Math.round(s*0.34)}px;flex-shrink:0;overflow:hidden;">${initials}${logoImg}</div>`;
+}
 
 let state = { accounts: [], transactions: [], recurring: [], activeTab: 'dashboard', reportScope: 'todos', month: null, ready: false };
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -427,6 +475,7 @@ function renderDashboard(){
       <div class="quick-action empresa" onclick="openTxSheet('empresa')"><div class="qa-icon">+</div><div><div class="qa-label">Lançamento</div><div class="qa-sub">Empresa</div></div></div>
       <div class="quick-action pessoal" onclick="openTxSheet('pessoal')"><div class="qa-icon">+</div><div><div class="qa-label">Lançamento</div><div class="qa-sub">Pessoal</div></div></div>
     </div>
+    <button class="add-acc-btn" style="margin-top:-8px; margin-bottom:14px;" onclick="openImportSheet()">⇪ Importar extrato do banco (OFX/CSV)</button>
     <div class="hero-row">
       <div class="hero-split empresa"><div class="label"><span class="dot empresa"></span> Empresa</div><div class="value">${fmt(totalBalanceByType('empresa'))}</div></div>
       <div class="hero-split pessoal"><div class="label"><span class="dot pessoal"></span> Pessoal</div><div class="value">${fmt(totalBalanceByType('pessoal'))}</div></div>
@@ -459,6 +508,28 @@ function renderScope(scope){
       <div class="mini-card out"><div class="lbl">Saídas</div><div class="val">${fmt(sumBy(mt,'saida'))}</div></div>
     </div>
     <button class="btn-primary ${scope}" onclick="openTxSheet('${scope}')">+ Novo lançamento</button>
+    ${renderAccountsSection(scope)}
+  `;
+}
+
+function renderAccountsSection(scope){
+  const accounts = state.accounts.filter(a=> scope==='pessoal' ? a.type==='pessoal' : a.type!=='pessoal');
+  const label = scope==='empresa' ? 'empresa' : 'pessoal';
+  return `
+    <div class="section-title">Contas <span class="tag">${accounts.length}</span></div>
+    ${accounts.length ? accounts.map(a=>`
+      <div class="acc-card">
+        ${bankBadgeHTML(a.bankId, 40, a.customBank)}
+        <div class="acc-mid">
+          <div class="acc-name">${escHtml(a.name)}</div>
+          <div class="acc-bal">${bankDisplayName(a)} · ${fmt(accountBalance(a.id))}</div>
+        </div>
+        <div class="acc-actions">
+          <button class="icon-btn" onclick="openAccountSheet('${scope}','${a.id}')" title="Editar">✎</button>
+          <button class="icon-btn" onclick="deleteAccount('${a.id}')" title="Excluir">×</button>
+        </div>
+      </div>`).join('') : `<div class="empty" style="padding:16px 4px">Nenhuma conta ${label} cadastrada ainda.</div>`}
+    <button class="add-acc-btn" onclick="openAccountSheet('${scope}')">+ Adicionar conta ${label}</button>
   `;
 }
 
@@ -660,6 +731,266 @@ function saveTx(){
   if(!txDraft.date){ alert('Informe a data.'); return; }
   state.transactions.push({...txDraft, amount: Number(txDraft.amount)});
   saveTransactions(); closeSheet(); render();
+}
+
+/* ===== Contas bancárias ===== */
+let accDraft = null;
+function openAccountSheet(scope, id){
+  const existing = id ? state.accounts.find(a=>a.id===id) : null;
+  accDraft = existing ? {...existing, isNew:false} : {id:uid(), type:scope, bankId:'nubank', customBank:'', name:'', initialBalance:'', isNew:true};
+  renderAccountSheet();
+}
+function setAccBank(bankId){ accDraft.bankId = bankId; renderAccountSheet(); }
+function renderAccountSheet(){
+  const label = accDraft.type==='empresa' ? 'Empresa' : 'Pessoal';
+  const html = `
+    <h3>${accDraft.isNew ? 'Nova' : 'Editar'} conta — ${label}</h3>
+    <div class="field"><label>Banco</label>
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:2px;">
+        ${BANKS.map(b=>`
+          <div onclick="setAccBank('${b.id}')" style="cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:5px; padding:8px 4px; border-radius:12px; border:2px solid ${b.id===accDraft.bankId?'var(--brand)':'transparent'}; background:${b.id===accDraft.bankId?'var(--brand-light)':'transparent'};">
+            ${bankBadgeHTML(b.id,34)}
+            <span style="font-size:9px; text-align:center; color:var(--paper); line-height:1.2;">${b.name}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+    ${accDraft.bankId==='outro' ? `<div class="field"><label>Nome do banco</label><input type="text" maxlength="40" value="${escHtml(accDraft.customBank||'')}" oninput="accDraft.customBank=this.value" placeholder="Ex.: Banco XYZ"></div>` : ''}
+    <div class="field"><label>Apelido da conta (opcional)</label><input type="text" maxlength="40" value="${escHtml(accDraft.name)}" oninput="accDraft.name=this.value" placeholder="Ex.: Conta corrente"></div>
+    <div class="field"><label>Saldo inicial (R$)</label><input type="number" step="0.01" value="${accDraft.initialBalance}" oninput="accDraft.initialBalance=this.value" placeholder="0,00"></div>
+    <div class="sheet-actions">
+      <button class="btn ghost" onclick="closeSheet()">Cancelar</button>
+      <button class="btn save" onclick="saveAccount()">Salvar</button>
+    </div>
+    ${!accDraft.isNew ? `<button class="btn danger" style="width:100%; margin-top:10px;" onclick="deleteAccount('${accDraft.id}')">Excluir conta</button>` : ''}
+  `;
+  openSheetHTML(html);
+}
+function saveAccount(){
+  if(accDraft.bankId==='outro' && !(accDraft.customBank||'').trim()){ alert('Informe o nome do banco.'); return; }
+  const displayName = accDraft.bankId==='outro' ? accDraft.customBank.trim() : bankById(accDraft.bankId).name;
+  const payload = {
+    id: accDraft.id, type: accDraft.type, bankId: accDraft.bankId,
+    customBank: accDraft.bankId==='outro' ? accDraft.customBank.trim() : '',
+    name: (accDraft.name||'').trim() || displayName,
+    initialBalance: Number(accDraft.initialBalance)||0
+  };
+  const idx = state.accounts.findIndex(a=>a.id===payload.id);
+  if(idx>=0) state.accounts[idx] = payload; else state.accounts.push(payload);
+  saveAccounts(); closeSheet(); render();
+}
+function deleteAccount(id){
+  if(!confirm('Excluir esta conta? Os lançamentos vinculados a ela não serão apagados, apenas ficarão sem conta associada.')) return;
+  state.accounts = state.accounts.filter(a=>a.id!==id);
+  state.transactions.forEach(t=>{ if(t.accountId===id) t.accountId=''; });
+  saveAccounts(); saveTransactions(); closeSheet(); render();
+}
+
+/* ===== Importação de extrato (OFX / CSV) ===== */
+function guessCategory(scope, type, text){
+  const t = (text||'').toLowerCase();
+  const rules = {
+    empresa: {
+      entrada: [[/adesao|adesão/,'adesao'],[/premia/,'premiacao'],[/comiss/,'comissao'],[/venda/,'vendas'],[/servi[cç]o/,'servicos'],[/cliente|receb/,'recebimento'],[/aporte|s[oó]cio/,'aporte']],
+      saida: [[/invest/,'investimento'],[/an[uú]ncio|\bads\b|facebook|google ads|instagram/,'anuncios'],[/aluguel|condom[ií]nio/,'aluguel'],[/folha|sal[aá]rio.*func|pagamento.*func/,'folha'],[/fornecedor/,'fornecedores'],[/imposto|darf|\bdas\b|inss|fgts|\btaxa\b/,'impostos'],[/equipamento|notebook|computador/,'equipamentos'],[/software|assinatura|saas|licen[cç]a/,'software'],[/uber|99app|combust[ií]vel|transporte|estacionamento/,'transporte_empresa'],[/consultoria|terceiriz/,'servicos_terceiros'],[/tarifa|manuten[cç][aã]o.*conta/,'tarifas']]
+    },
+    pessoal: {
+      entrada: [[/pr[oó].?labore/,'prolabore'],[/sal[aá]rio/,'salario'],[/empr[eé]stimo/,'emprestimo'],[/presente|ajuda/,'presente'],[/rendimento|dividendo|\bjuros\b/,'rendimento'],[/reembolso/,'reembolso']],
+      saida: [[/aluguel|condom[ií]nio|financiamento.*(casa|imovel|imóvel)|\biptu\b/,'moradia'],[/restaurante|ifood|lanche|padaria/,'alimentacao'],[/supermercado|\bmercado\b|hortifruti/,'supermercado'],[/uber|99app|combust[ií]vel|transporte|estacionamento|[oô]nibus/,'transporte'],[/farm[aá]cia|hospital|m[eé]dic|plano de sa[uú]de|dentista/,'saude'],[/escola|faculdade|\bcurso\b|mensalidade/,'educacao'],[/cinema|streaming|netflix|spotify|\bshow\b|viagem/,'lazer'],[/\bfilho\b|creche|escola infantil/,'familia'],[/\bloja\b|roupa|cal[cç]ado/,'vestuario'],[/energia|\b[aá]gua\b|internet|telefone|assinatura/,'contas'],[/empr[eé]stimo/,'emprestimo_pagamento'],[/cart[aã]o de cr[eé]dito|\bfatura\b/,'cartao']]
+    }
+  };
+  const list = (rules[scope] && rules[scope][type]) || [];
+  for(const [re,key] of list){ if(re.test(t)) return key; }
+  return type==='entrada' ? 'outras_entradas' : 'outras_saidas';
+}
+function parseBRDate(str){
+  if(!str) return '';
+  str = String(str).trim();
+  let m = str.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = str.match(/^(\d{4})(\d{2})(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m){ let [,d,mo,y] = m; if(y.length===2) y = (Number(y)>50?'19':'20')+y; return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`; }
+  return '';
+}
+function parseAmountStr(str){
+  if(str===undefined||str===null) return NaN;
+  let s = String(str).trim(); if(!s) return NaN;
+  let neg = false;
+  if(/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1,-1); }
+  s = s.replace(/R\$\s?/i,'').replace(/\s/g,'');
+  if(s.startsWith('-')){ neg = true; s = s.slice(1); } else if(s.startsWith('+')){ s = s.slice(1); }
+  if(s.includes(',') && s.includes('.')){
+    if(s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g,'').replace(',','.');
+    else s = s.replace(/,/g,'');
+  } else if(s.includes(',')){ s = s.replace(',', '.'); }
+  const n = parseFloat(s);
+  if(isNaN(n)) return NaN;
+  return neg ? -n : n;
+}
+function parseOFX(text){
+  const rows = [];
+  const blocks = text.match(/<STMTTRN>[\s\S]*?(?:<\/STMTTRN>|(?=<STMTTRN>)|(?=<\/BANKTRANLIST>))/gi) || [];
+  blocks.forEach(block=>{
+    const get = (tag)=>{ const m = block.match(new RegExp('<'+tag+'>([^<\\r\\n]*)','i')); return m ? m[1].trim() : ''; };
+    const date = parseBRDate(get('DTPOSTED'));
+    const amount = parseAmountStr(get('TRNAMT'));
+    const name = get('NAME'), memo = get('MEMO'), payee = get('PAYEE');
+    let desc = name || payee || memo || 'Transação importada';
+    if(memo && desc !== memo) desc += ' - ' + memo;
+    if(date && !isNaN(amount) && amount !== 0) rows.push({date, description: desc, amount});
+  });
+  return rows;
+}
+function detectDelimiter(line){
+  const counts = {',':(line.match(/,/g)||[]).length, ';':(line.match(/;/g)||[]).length, '\t':(line.match(/\t/g)||[]).length};
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+}
+function splitCSVLine(line, delim){
+  const result = []; let cur='', inQuotes=false;
+  for(let i=0;i<line.length;i++){
+    const ch = line[i];
+    if(ch === '"'){ inQuotes = !inQuotes; continue; }
+    if(ch === delim && !inQuotes){ result.push(cur); cur=''; continue; }
+    cur += ch;
+  }
+  result.push(cur);
+  return result.map(s=>s.trim());
+}
+function parseCSV(text){
+  const lines = text.split(/\r\n|\n|\r/).filter(l=>l.trim().length);
+  if(!lines.length) return [];
+  const delim = detectDelimiter(lines[0]);
+  const header = splitCSVLine(lines[0], delim).map(h=>h.toLowerCase());
+  const findCol = (patterns)=> header.findIndex(h=>patterns.some(p=>h.includes(p)));
+  let dateIdx = findCol(['data','date']);
+  let descIdx = findCol(['histor','descri','memo','lancamento','lançamento','detalhe']);
+  let amountIdx = findCol(['valor','amount','montante']);
+  let debitIdx = findCol(['debito','débito','saida','saída']);
+  let creditIdx = findCol(['credito','crédito','entrada']);
+  let startRow = 1;
+  const looksLikeHeader = dateIdx>=0 || descIdx>=0 || amountIdx>=0 || debitIdx>=0 || creditIdx>=0;
+  if(!looksLikeHeader){ dateIdx=0; descIdx=1; amountIdx=2; startRow=0; }
+  const rows = [];
+  for(let i=startRow;i<lines.length;i++){
+    const cols = splitCSVLine(lines[i], delim);
+    if(cols.length<2) continue;
+    const date = parseBRDate(dateIdx>=0 ? cols[dateIdx] : '');
+    const description = descIdx>=0 ? cols[descIdx] : cols.filter((_,idx)=>idx!==dateIdx && idx!==amountIdx).join(' ');
+    let amount;
+    if(amountIdx>=0){ amount = parseAmountStr(cols[amountIdx]); }
+    else{
+      const c = creditIdx>=0 ? parseAmountStr(cols[creditIdx]) : NaN;
+      const d = debitIdx>=0 ? parseAmountStr(cols[debitIdx]) : NaN;
+      if(!isNaN(c) && c!==0) amount = Math.abs(c); else if(!isNaN(d) && d!==0) amount = -Math.abs(d);
+    }
+    if(date && amount!==undefined && !isNaN(amount) && amount !== 0) rows.push({date, description: description || 'Transação importada', amount});
+  }
+  return rows;
+}
+
+let importDraft = null;
+function openImportSheet(){ importDraft = { scope:'empresa', accountId:'', rows:null, fileName:'' }; renderImportStep1(); }
+function setImportScope(scope){ importDraft.scope = scope; importDraft.accountId=''; renderImportStep1(); }
+function renderImportStep1(){
+  const accounts = state.accounts.filter(a=> importDraft.scope==='pessoal' ? a.type==='pessoal' : a.type!=='pessoal');
+  const html = `
+    <h3>Importar extrato bancário</h3>
+    <p class="hint" style="font-size:12px;color:var(--muted);line-height:1.5;margin:-8px 0 16px">Envie o extrato exportado do seu banco em formato <b>OFX</b> (recomendado) ou <b>CSV</b>. Você vai revisar cada lançamento antes de confirmar — nada é importado automaticamente.</p>
+    <div class="toggle-row">
+      <button class="toggle-opt ${importDraft.scope==='empresa'?'sel-in':''}" onclick="setImportScope('empresa')">Empresa</button>
+      <button class="toggle-opt ${importDraft.scope==='pessoal'?'sel-pessoal':''}" onclick="setImportScope('pessoal')">Pessoal</button>
+    </div>
+    <div class="field"><label>Conta (opcional)</label><select onchange="importDraft.accountId=this.value">
+      <option value="">Sem conta vinculada</option>
+      ${accounts.map(a=>`<option value="${a.id}" ${a.id===importDraft.accountId?'selected':''}>${escHtml(a.name)}</option>`).join('')}
+    </select></div>
+    <div class="field"><label>Arquivo do extrato (.ofx ou .csv)</label>
+      <input type="file" accept=".ofx,.csv,text/csv,application/x-ofx" onchange="handleImportFile(event)">
+    </div>
+    <div id="import-file-status" style="font-size:12px;color:var(--muted);margin:-6px 0 4px;"></div>
+    <div class="sheet-actions"><button class="btn ghost" onclick="closeSheet()">Cancelar</button></div>
+  `;
+  openSheetHTML(html);
+}
+function handleImportFile(evt){
+  const file = evt.target.files && evt.target.files[0];
+  if(!file) return;
+  importDraft.fileName = file.name;
+  const status = document.getElementById('import-file-status');
+  if(status) status.textContent = 'Lendo arquivo...';
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const text = reader.result;
+      const isOFX = /\.ofx$/i.test(file.name) || /<OFX>|OFXHEADER/i.test(text);
+      const parsed = isOFX ? parseOFX(text) : parseCSV(text);
+      if(!parsed.length){ if(status) status.textContent = 'Não foi possível identificar lançamentos neste arquivo. Verifique o formato.'; return; }
+      importDraft.rows = parsed.map(r=>{
+        const type = r.amount >= 0 ? 'entrada' : 'saida';
+        const amount = Math.abs(r.amount);
+        const isDup = state.transactions.some(t=> t.scope===importDraft.scope && t.date===r.date && Math.abs(Number(t.amount)-amount)<0.005 && (t.description||'').trim().toLowerCase()===(r.description||'').trim().toLowerCase());
+        return { date: r.date, description: r.description, amount, type, category: guessCategory(importDraft.scope, type, r.description), checked: !isDup, dup: isDup };
+      });
+      renderImportPreview();
+    }catch(e){ if(status) status.textContent = 'Erro ao ler o arquivo. Tente outro formato.'; }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+function renderImportPreview(){
+  const rows = importDraft.rows;
+  const selectedCount = rows.filter(r=>r.checked).length;
+  const dupCount = rows.filter(r=>r.dup).length;
+  const html = `
+    <h3>Revisar importação — ${importDraft.scope==='empresa'?'Empresa':'Pessoal'}</h3>
+    <p class="hint" style="font-size:12px;color:var(--muted);line-height:1.5;margin:-8px 0 12px">
+      ${rows.length} lançamento(s) encontrados em <b>${escHtml(importDraft.fileName)}</b>.
+      ${dupCount ? `${dupCount} parecem já existir e vieram desmarcados.` : 'Confira categorias e valores antes de confirmar.'}
+    </p>
+    <div style="max-height:46vh; overflow-y:auto; border:1px solid var(--edge); border-radius:12px; padding:2px 10px;">
+      ${rows.map((r,i)=>`
+        <div class="fixed-item" style="align-items:flex-start;">
+          <input type="checkbox" ${r.checked?'checked':''} onchange="importDraft.rows[${i}].checked=this.checked" style="margin-top:14px; width:16px; height:16px; flex-shrink:0;">
+          <div class="fixed-mid">
+            <div style="display:flex; gap:6px; margin-bottom:6px;">
+              <input type="date" value="${r.date}" onchange="importDraft.rows[${i}].date=this.value" style="flex:1; min-height:36px; padding:6px 8px; font-size:11.5px; border:1px solid var(--edge); border-radius:8px; background:#F9FAFB;">
+              <button class="toggle-opt ${r.type==='entrada'?'sel-in':'sel-out'}" style="flex:none; padding:6px 10px; font-size:11px;" onclick="toggleImportRowType(${i})">${r.type==='entrada'?'Entrada':'Saída'}</button>
+            </div>
+            <input type="text" value="${escHtml(r.description)}" oninput="importDraft.rows[${i}].description=this.value" style="width:100%; min-height:36px; padding:6px 8px; font-size:12px; border:1px solid var(--edge); border-radius:8px; background:#F9FAFB; margin-bottom:6px;">
+            <div style="display:flex; gap:6px;">
+              <select onchange="importDraft.rows[${i}].category=this.value" style="flex:1; min-height:36px; padding:6px 8px; font-size:11.5px; border:1px solid var(--edge); border-radius:8px; background:#F9FAFB;">
+                ${CATS[importDraft.scope][r.type].map(c=>`<option value="${c.k}" ${c.k===r.category?'selected':''}>${c.l}</option>`).join('')}
+              </select>
+              <input type="number" step="0.01" min="0" value="${r.amount}" oninput="importDraft.rows[${i}].amount=this.value" style="width:96px; min-height:36px; padding:6px 8px; font-size:11.5px; border:1px solid var(--edge); border-radius:8px; background:#F9FAFB;">
+            </div>
+            ${r.dup ? '<div style="font-size:10px;color:var(--danger);margin-top:5px;">Possível duplicado — já existe um lançamento parecido</div>' : ''}
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="sheet-actions">
+      <button class="btn ghost" onclick="renderImportStep1()">Voltar</button>
+      <button class="btn save" onclick="confirmImport()">Importar (${selectedCount})</button>
+    </div>
+  `;
+  openSheetHTML(html);
+}
+function toggleImportRowType(i){
+  const r = importDraft.rows[i];
+  r.type = r.type==='entrada' ? 'saida' : 'entrada';
+  r.category = guessCategory(importDraft.scope, r.type, r.description);
+  renderImportPreview();
+}
+function confirmImport(){
+  const toImport = importDraft.rows.filter(r=>r.checked);
+  if(!toImport.length){ alert('Selecione ao menos um lançamento para importar.'); return; }
+  toImport.forEach(r=>{
+    state.transactions.push({
+      id: uid(), scope: importDraft.scope, type: r.type, category: r.category,
+      amount: Number(r.amount)||0, date: r.date, accountId: importDraft.accountId || '', description: r.description || ''
+    });
+  });
+  saveTransactions();
+  const count = toImport.length;
+  closeSheet(); render();
+  setTimeout(()=>alert(`${count} lançamento(s) importado(s) com sucesso.`), 150);
 }
 
 loadAll();
