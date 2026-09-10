@@ -1,10 +1,10 @@
-const CACHE_NAME = 'lcs-financas-v2';
+const CACHE_NAME = 'lcs-financas-v4';
 const APP_ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './icon-192.svg',
-  './icon-512.svg'
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', event => {

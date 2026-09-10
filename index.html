@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="LCS">
 <meta name="format-detection" content="telephone=no">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23E8F5E9'/%3E%3Ctext x='50' y='60' font-size='30' font-family='Inter,sans-serif' font-weight='800' fill='%230A8754' text-anchor='middle'%3ELCS%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -237,10 +237,7 @@
 <div id="root">
   <header class="topbar">
     <div class="topbar-left">
-      <svg class="logo-mark" viewBox="0 0 40 40" fill="none">
-        <rect x="1" y="1" width="38" height="38" rx="11" fill="#E8F5E9" stroke="#0A8754" stroke-width="1.4"/>
-        <text x="20" y="24" font-family="Inter, sans-serif" font-size="12.5" font-weight="800" fill="#0A8754" text-anchor="middle">LCS</text>
-      </svg>
+      <img class="logo-mark" src="icon-192.png" alt="Logo LCS Finanças">
       <div class="brand-text">
         <div class="b1">LCS <span>Finanças</span></div>
         <div class="sub">empresa &amp; pessoal</div>
@@ -296,12 +293,12 @@ const StorageProvider = {
 
 const CATS = {
   empresa: {
-    entrada: [{k:'adesao', l:'Adesão'},{k:'premiacao', l:'Premiação'},{k:'comissao', l:'Comissão'},{k:'outro', l:'Outro'}],
-    saida: [{k:'aluguel', l:'Aluguel / Estrutura'},{k:'folha', l:'Folha de Pagamento'},{k:'marketing', l:'Marketing'},{k:'impostos', l:'Impostos'},{k:'outro', l:'Outro'}]
+    entrada: [{k:'adesao', l:'Adesão'},{k:'premiacao', l:'Premiação'},{k:'comissao', l:'Comissão'},{k:'vendas', l:'Vendas'},{k:'servicos', l:'Prestação de serviços'},{k:'recebimento', l:'Recebimento de cliente'},{k:'aporte', l:'Aporte dos sócios'},{k:'outras_entradas', l:'Outras entradas'}],
+    saida: [{k:'investimento', l:'Investimentos'},{k:'anuncios', l:'Anúncios e publicidade'},{k:'aluguel', l:'Aluguel / estrutura'},{k:'folha', l:'Folha de pagamento'},{k:'fornecedores', l:'Fornecedores'},{k:'impostos', l:'Impostos e taxas'},{k:'equipamentos', l:'Equipamentos'},{k:'software', l:'Software e ferramentas'},{k:'transporte_empresa', l:'Transporte'},{k:'servicos_terceiros', l:'Serviços de terceiros'},{k:'tarifas', l:'Tarifas bancárias'},{k:'outras_saidas', l:'Outras saídas'}]
   },
   pessoal: {
-    entrada: [{k:'prolabore', l:'Pró-labore'},{k:'outro', l:'Outro'}],
-    saida: [{k:'moradia', l:'Moradia'},{k:'alimentacao', l:'Alimentação'},{k:'transporte', l:'Transporte'},{k:'outro', l:'Outro'}]
+    entrada: [{k:'prolabore', l:'Pró-labore'},{k:'salario', l:'Salário'},{k:'emprestimo', l:'Empréstimo recebido'},{k:'presente', l:'Presente ou ajuda'},{k:'rendimento', l:'Rendimentos'},{k:'reembolso', l:'Reembolso'},{k:'outras_entradas', l:'Outras entradas pessoais'}],
+    saida: [{k:'moradia', l:'Moradia'},{k:'alimentacao', l:'Alimentação'},{k:'supermercado', l:'Supermercado'},{k:'transporte', l:'Transporte / Uber'},{k:'saude', l:'Saúde'},{k:'educacao', l:'Educação'},{k:'lazer', l:'Lazer'},{k:'familia', l:'Família e filhos'},{k:'vestuario', l:'Vestuário'},{k:'contas', l:'Contas e assinaturas'},{k:'emprestimo_pagamento', l:'Pagamento de empréstimo'},{k:'cartao', l:'Cartão de crédito'},{k:'outras_saidas', l:'Outras saídas pessoais'}]
   }
 };
 
@@ -543,13 +540,29 @@ function openSheetHTML(html){ document.getElementById('sheet').innerHTML = `<div
 
 let txDraft = null;
 function openTxSheet(scope){
-  txDraft = { id: uid(), scope, type:'entrada', category: CATS[scope]['entrada'][0].k, amount:'', date: todayISO(), accountId: '' };
+  txDraft = { id: uid(), scope, type:'entrada', category: CATS[scope].entrada[0].k, amount:'', date: todayISO(), accountId: '', description:'' };
   renderTxSheet();
 }
+function setTxType(type){
+  txDraft.type = type;
+  txDraft.category = CATS[txDraft.scope][type][0].k;
+  renderTxSheet();
+}
+function setTxCategory(value){ txDraft.category = value; }
 function renderTxSheet(){
+  const cats = CATS[txDraft.scope][txDraft.type];
+  const accounts = state.accounts.filter(a=>txDraft.scope==='pessoal' ? a.type==='pessoal' : a.type!=='pessoal');
   const html = `
-    <h3>Novo Lançamento (${txDraft.scope})</h3>
-    <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" id="tx-amt" value="${txDraft.amount}" oninput="txDraft.amount=this.value" placeholder="0,00"></div>
+    <h3>Novo lançamento — ${txDraft.scope==='empresa'?'Empresa':'Pessoal'}</h3>
+    <div class="toggle-row">
+      <button class="toggle-opt ${txDraft.type==='entrada'?'sel-in':''}" onclick="setTxType('entrada')">Entrada</button>
+      <button class="toggle-opt ${txDraft.type==='saida'?'sel-out':''}" onclick="setTxType('saida')">Saída</button>
+    </div>
+    <div class="field"><label>Categoria</label><select onchange="setTxCategory(this.value)">${cats.map(c=>`<option value="${c.k}" ${c.k===txDraft.category?'selected':''}>${c.l}</option>`).join('')}</select></div>
+    <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" min="0" id="tx-amt" value="${txDraft.amount}" oninput="txDraft.amount=this.value" placeholder="0,00"></div>
+    <div class="field"><label>Data</label><input type="date" value="${txDraft.date}" onchange="txDraft.date=this.value"></div>
+    <div class="field"><label>Descrição (opcional)</label><input type="text" maxlength="80" value="${txDraft.description}" oninput="txDraft.description=this.value" placeholder="Ex.: Uber para reunião"></div>
+    <div class="field"><label>Conta (opcional)</label><select onchange="txDraft.accountId=this.value"><option value="">Sem conta vinculada</option>${accounts.map(a=>`<option value="${a.id}" ${a.id===txDraft.accountId?'selected':''}>${a.name}</option>`).join('')}</select></div>
     <div class="sheet-actions">
       <button class="btn ghost" onclick="closeSheet()">Cancelar</button>
       <button class="btn save" onclick="saveTx()">Salvar</button>
@@ -559,6 +572,7 @@ function renderTxSheet(){
 }
 function saveTx(){
   if(!txDraft.amount || Number(txDraft.amount)<=0){ alert('Valor inválido.'); return; }
+  if(!txDraft.date){ alert('Informe a data.'); return; }
   state.transactions.push({...txDraft, amount: Number(txDraft.amount)});
   saveTransactions(); closeSheet(); render();
 }
