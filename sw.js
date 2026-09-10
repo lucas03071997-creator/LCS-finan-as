@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lcs-financas-v4';
+const CACHE_NAME = 'lcs-financas-v5';
 const APP_ASSETS = [
   './',
   './index.html',

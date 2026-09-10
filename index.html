@@ -171,6 +171,27 @@
   .pdf-btn{padding:11px 8px; border:0; border-radius:11px; color:#fff; font-size:11px; font-weight:700; cursor:pointer;}
   .pdf-btn.empresa{background:linear-gradient(135deg, var(--brand), var(--brand-dark));}
   .pdf-btn.pessoal{background:var(--slate);}
+  .fixed-scope{margin-bottom:18px;}
+  .fixed-scope-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:9px;}
+  .fixed-scope-title{display:flex; align-items:center; gap:7px; font-size:16px; font-weight:800;}
+  .fixed-total{font-size:12px; color:var(--muted); font-weight:600;}
+  .fixed-item{display:flex; align-items:center; gap:10px; padding:12px 4px; border-bottom:1px solid var(--edge);}
+  .fixed-item:last-child{border-bottom:none;}
+  .fixed-icon{width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;}
+  .fixed-icon.empresa{background:var(--brand-light); color:var(--brand-dark);}
+  .fixed-icon.pessoal{background:var(--slate-light); color:var(--slate);}
+  .fixed-mid{flex:1; min-width:0;}
+  .fixed-name{font-size:13px; font-weight:700; color:var(--paper); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .fixed-meta{font-size:10.5px; color:var(--muted); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .fixed-value{font-size:12.5px; font-weight:800; text-align:right; white-space:nowrap;}
+  .fixed-value.in{color:var(--brand-dark);}
+  .fixed-value.out{color:var(--danger);}
+  .fixed-actions{display:flex; gap:5px; margin-left:5px;}
+  .fixed-action{width:27px; height:27px; border:1px solid var(--edge); border-radius:8px; background:var(--panel-2); color:var(--muted); font-size:12px; cursor:pointer;}
+  .fixed-add{width:100%; margin-top:8px; padding:11px; border:1.5px dashed var(--edge-strong); border-radius:11px; background:transparent; font-size:12px; font-weight:700; cursor:pointer;}
+  .fixed-add.empresa{color:var(--brand-dark);}
+  .fixed-add.pessoal{color:var(--slate);}
+  .fixed-empty{padding:12px 4px; color:var(--muted); font-size:12px; text-align:center;}
 
   .tx-item{display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:1px solid var(--edge); cursor:pointer;}
   .tx-item:last-child{border-bottom:none;}
@@ -441,6 +462,69 @@ function renderScope(scope){
   `;
 }
 
+function escHtml(value){ return String(value ?? '').replace(/[&<>'"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+function recurringFor(scope){ return state.recurring.filter(r=>r.scope===scope); }
+function recurringTotal(scope, type){ return recurringFor(scope).filter(r=>r.type===type).reduce((s,r)=>s+Number(r.amount||0),0); }
+
+function renderRecurringItems(scope){
+  const items = recurringFor(scope).sort((a,b)=>(Number(a.dueDay)||99)-(Number(b.dueDay)||99));
+  if(!items.length) return '<div class="fixed-empty">Nenhuma conta fixa cadastrada.</div>';
+  return items.map(r=>`<div class="fixed-item">
+    <div class="fixed-icon ${scope}">${r.type==='entrada'?'↑':'↓'}</div>
+    <div class="fixed-mid"><div class="fixed-name">${escHtml(r.name)}</div><div class="fixed-meta">${catLabel(scope,r.type,r.category)} · vence dia ${r.dueDay||'—'} · ${r.frequency==='annual'?'Anual':'Mensal'}${r.description?' · '+escHtml(r.description):''}</div></div>
+    <div class="fixed-value ${r.type==='entrada'?'in':'out'}">${r.type==='entrada'?'+':'−'} ${fmt(r.amount)}</div>
+    <div class="fixed-actions"><button class="fixed-action" onclick="openRecurringSheet('${scope}','${r.id}')" title="Editar">✎</button><button class="fixed-action" onclick="deleteRecurring('${r.id}')" title="Excluir">×</button></div>
+  </div>`).join('');
+}
+
+function renderFixedScope(scope){
+  const label = scope==='empresa' ? 'Empresa' : 'Pessoal';
+  const entradas = recurringTotal(scope,'entrada');
+  const saidas = recurringTotal(scope,'saida');
+  return `<section class="fixed-scope">
+    <div class="fixed-scope-head"><div class="fixed-scope-title"><span class="dot ${scope}"></span>${label}</div><div class="fixed-total">${fmt(saidas)} em saídas/mês</div></div>
+    <div class="card"><div class="report-summary" style="margin-bottom:4px"><div class="report-card in"><div class="lbl">Entradas fixas</div><div class="val">${fmt(entradas)}</div></div><div class="report-card out"><div class="lbl">Saídas fixas</div><div class="val">${fmt(saidas)}</div></div></div>${renderRecurringItems(scope)}</div>
+    <button class="fixed-add ${scope}" onclick="openRecurringSheet('${scope}')">+ Adicionar conta fixa ${label.toLowerCase()}</button>
+  </section>`;
+}
+
+function renderFixed(){
+  return `<div class="head-scope"><div class="h-title">Contas fixas</div></div>
+    <p class="hint" style="font-size:12px;color:var(--muted);line-height:1.5;margin:4px 0 18px">Cadastre compromissos recorrentes separando o fluxo da empresa do seu fluxo pessoal.</p>
+    ${renderFixedScope('empresa')}
+    ${renderFixedScope('pessoal')}`;
+}
+
+let recurringDraft = null;
+function openRecurringSheet(scope, id){
+  const existing = id ? state.recurring.find(r=>r.id===id) : null;
+  recurringDraft = existing ? {...existing} : {id:uid(), scope, type:'saida', category:CATS[scope].saida[0].k, name:'', amount:'', dueDay:'', frequency:'monthly', description:''};
+  renderRecurringSheet();
+}
+function setRecurringType(type){ recurringDraft.type=type; recurringDraft.category=CATS[recurringDraft.scope][type][0].k; renderRecurringSheet(); }
+function renderRecurringSheet(){
+  const cats = CATS[recurringDraft.scope][recurringDraft.type];
+  const label = recurringDraft.scope==='empresa'?'Empresa':'Pessoal';
+  const html = `<h3>${recurringDraft.name?'Editar':'Nova'} conta fixa — ${label}</h3>
+    <div class="toggle-row"><button class="toggle-opt ${recurringDraft.type==='entrada'?'sel-in':''}" onclick="setRecurringType('entrada')">Entrada</button><button class="toggle-opt ${recurringDraft.type==='saida'?'sel-out':''}" onclick="setRecurringType('saida')">Saída</button></div>
+    <div class="field"><label>Nome da conta</label><input type="text" maxlength="60" value="${escHtml(recurringDraft.name)}" oninput="recurringDraft.name=this.value" placeholder="Ex.: Aluguel do escritório"></div>
+    <div class="field"><label>Categoria</label><select onchange="recurringDraft.category=this.value">${cats.map(c=>`<option value="${c.k}" ${c.k===recurringDraft.category?'selected':''}>${c.l}</option>`).join('')}</select></div>
+    <div class="field"><label>Valor (R$)</label><input type="number" min="0" step="0.01" value="${recurringDraft.amount}" oninput="recurringDraft.amount=this.value" placeholder="0,00"></div>
+    <div class="grid-2" style="margin-bottom:0"><div class="field"><label>Vencimento (dia)</label><input type="number" min="1" max="31" value="${recurringDraft.dueDay}" oninput="recurringDraft.dueDay=this.value" placeholder="Ex.: 10"></div><div class="field"><label>Frequência</label><select onchange="recurringDraft.frequency=this.value"><option value="monthly" ${recurringDraft.frequency==='monthly'?'selected':''}>Mensal</option><option value="annual" ${recurringDraft.frequency==='annual'?'selected':''}>Anual</option></select></div></div>
+    <div class="field"><label>Observação (opcional)</label><input type="text" maxlength="80" value="${escHtml(recurringDraft.description)}" oninput="recurringDraft.description=this.value" placeholder="Ex.: contrato renovável"></div>
+    <div class="sheet-actions"><button class="btn ghost" onclick="closeSheet()">Cancelar</button><button class="btn save" onclick="saveRecurringItem()">Salvar</button></div>`;
+  openSheetHTML(html);
+}
+function saveRecurringItem(){
+  if(!recurringDraft.name.trim()){ alert('Informe o nome da conta.'); return; }
+  if(!recurringDraft.amount || Number(recurringDraft.amount)<=0){ alert('Informe um valor válido.'); return; }
+  const day=Number(recurringDraft.dueDay); if(!day || day<1 || day>31){ alert('Informe um dia de vencimento entre 1 e 31.'); return; }
+  recurringDraft.amount=Number(recurringDraft.amount); recurringDraft.dueDay=day;
+  const idx=state.recurring.findIndex(r=>r.id===recurringDraft.id); if(idx>=0) state.recurring[idx]={...recurringDraft}; else state.recurring.push({...recurringDraft});
+  saveRecurring(); closeSheet(); render();
+}
+function deleteRecurring(id){ if(!confirm('Excluir esta conta fixa?')) return; state.recurring=state.recurring.filter(r=>r.id!==id); saveRecurring(); render(); }
+
 function reportCategories(list, type){
   const totals = {};
   list.filter(t=>t.type===type).forEach(t=>{
@@ -531,6 +615,7 @@ function render(){
   if(state.activeTab==='dashboard') c.innerHTML = renderDashboard();
   else if(state.activeTab==='empresa') c.innerHTML = renderScope('empresa');
   else if(state.activeTab==='pessoal') c.innerHTML = renderScope('pessoal');
+  else if(state.activeTab==='fixas') c.innerHTML = renderFixed();
   else if(state.activeTab==='relatorios') c.innerHTML = renderReports();
   else c.innerHTML = `<div class="empty">Aba em desenvolvimento.</div>`;
 }
