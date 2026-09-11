@@ -997,7 +997,19 @@ function parseAmountStr(str){
   if(isNaN(n)) return NaN;
   return neg ? -n : n;
 }
+// Alguns extratos exportados vêm com acentuação corrompida (UTF-8 lido como Latin-1 e regravado),
+// ex.: "HistÃ³rico" em vez de "Histórico", ou "ï»¿" no início do arquivo. Detecta e corrige isso.
+function fixMojibake(text){
+  if(!/Ã[-¿]|ï»¿/.test(text)) return text;
+  try{
+    const bytes = new Uint8Array(text.length);
+    for(let i=0;i<text.length;i++){ const code = text.charCodeAt(i); bytes[i] = code < 256 ? code : 63; }
+    const fixed = new TextDecoder('utf-8', {fatal:false}).decode(bytes);
+    return fixed && fixed.indexOf('�') === -1 ? fixed : text;
+  }catch(e){ return text; }
+}
 function parseOFX(text){
+  text = fixMojibake(text);
   const rows = [];
   const blocks = text.match(/<STMTTRN>[\s\S]*?(?:<\/STMTTRN>|(?=<STMTTRN>)|(?=<\/BANKTRANLIST>))/gi) || [];
   blocks.forEach(block=>{
@@ -1033,22 +1045,51 @@ function splitCSVLine(line, delim){
   result.push(cur);
   return result.map(s=>s.trim());
 }
+// Procura a linha de cabeçalho de verdade em vez de assumir que é a primeira linha do arquivo —
+// extratos exportados costumam ter uma linha de título antes (ex.: "Extrato de: Ag: ... | Conta: ...").
+// Remove acentos antes de comparar cabeçalhos — "histórico".includes("histor") é FALSE em JS
+// por causa do "ó" acentuado, então sem isso várias colunas reais passavam batido.
+function normalizeForMatch(s){
+  return String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+}
+function findCSVHeaderRow(lines, delim){
+  const limit = Math.min(lines.length, 15);
+  for(let i=0;i<limit;i++){
+    const cols = splitCSVLine(lines[i], delim).map(normalizeForMatch);
+    const hasDate = cols.some(c=>c.includes('data')||c.includes('date'));
+    const hasDesc = cols.some(c=>c.includes('histor')||c.includes('descri')||c.includes('memo')||c.includes('detalhe')||c.includes('lancamento'));
+    const hasValueCol = cols.some(c=>c.includes('valor')||c.includes('amount')||c.includes('montante')||c.includes('credito')||c.includes('debito'));
+    if(hasDate && hasDesc && hasValueCol) return i;
+  }
+  return -1;
+}
 function parseCSV(text){
+  text = fixMojibake(text);
   const lines = text.split(/\r\n|\n|\r/).filter(l=>l.trim().length);
   if(!lines.length) return [];
-  const delim = detectDelimiter(lines[0]);
-  const header = splitCSVLine(lines[0], delim).map(h=>h.toLowerCase());
+  let delim = detectDelimiter(lines[0]);
+  let headerRowIdx = findCSVHeaderRow(lines, delim);
+  if(headerRowIdx < 0){
+    // a 1ª linha pode não ser representativa do delimitador real quando há uma linha de título antes do cabeçalho
+    delim = detectDelimiter(lines.slice(0, Math.min(lines.length,5)).join('\n'));
+    headerRowIdx = findCSVHeaderRow(lines, delim);
+  }
+  const header = headerRowIdx>=0 ? splitCSVLine(lines[headerRowIdx], delim).map(normalizeForMatch) : [];
   // documento/número de referência nunca deve ser confundido com data, descrição ou valor
-  const docCols = header.map((h,idx)=> (h.includes('documento') || h.includes('núm') || h.includes('num.') || h.includes('referência') || h.includes('referencia')) ? idx : -1).filter(idx=>idx>=0);
+  const docCols = header.map((h,idx)=> (h.includes('documento') || h.includes('docto') || h.includes('núm') || h.includes('num.') || h.includes('referência') || h.includes('referencia')) ? idx : -1).filter(idx=>idx>=0);
   const findCol = (patterns, exclude=[])=> header.findIndex((h,idx)=> !exclude.includes(idx) && !docCols.includes(idx) && patterns.some(p=>h.includes(p)));
-  let dateIdx = findCol(['data','date']);
-  let descIdx = findCol(['histor','descri','memo','lancamento','lançamento','detalhe'], [dateIdx]);
-  let amountIdx = findCol(['valor','amount','montante']);
-  let debitIdx = findCol(['debito','débito','saida','saída']);
-  let creditIdx = findCol(['credito','crédito','entrada']);
-  let startRow = 1;
-  const looksLikeHeader = dateIdx>=0 || descIdx>=0 || amountIdx>=0 || debitIdx>=0 || creditIdx>=0;
-  if(!looksLikeHeader){ dateIdx=0; descIdx=1; amountIdx=2; startRow=0; }
+  let dateIdx, descIdx, amountIdx, debitIdx, creditIdx, startRow;
+  if(headerRowIdx >= 0){
+    dateIdx = findCol(['data','date']);
+    descIdx = findCol(['histor','descri','memo','lancamento','lançamento','detalhe'], [dateIdx]);
+    amountIdx = findCol(['valor','amount','montante']);
+    debitIdx = findCol(['debito','débito','saida','saída']);
+    creditIdx = findCol(['credito','crédito','entrada']);
+    startRow = headerRowIdx + 1;
+  } else {
+    // nenhum cabeçalho reconhecível: assume a ordem mais comum (data, descrição, valor) a partir da 1ª linha
+    dateIdx = 0; descIdx = 1; amountIdx = 2; debitIdx = -1; creditIdx = -1; startRow = 0;
+  }
   const rows = [];
   for(let i=startRow;i<lines.length;i++){
     const cols = splitCSVLine(lines[i], delim);
@@ -1098,25 +1139,25 @@ function extractXLSXRows(arrayBuffer){
 // por isso procuramos a linha de cabeçalho em vez de assumir que é a primeira linha.
 function findXLSXHeaderRow(rows){
   for(let i=0;i<rows.length;i++){
-    const row = (rows[i]||[]).map(c=> (c==null?'':String(c)).toLowerCase());
+    const row = (rows[i]||[]).map(normalizeForMatch);
     const hasDate = row.some(c=>c.includes('data'));
-    const hasValor = row.some(c=>c.includes('valor'));
+    const hasValue = row.some(c=>c.includes('valor')||c.includes('credito')||c.includes('debito'));
     const hasDesc = row.some(c=>c.includes('descri') || c.includes('histor'));
-    if(hasDate && hasValor && hasDesc) return i;
+    if(hasDate && hasValue && hasDesc) return i;
   }
   return -1;
 }
 function parseXLSXStatement(rows){
   const headerIdx = findXLSXHeaderRow(rows);
   if(headerIdx < 0) return [];
-  const header = (rows[headerIdx]||[]).map(c=> (c==null?'':String(c)).toLowerCase());
+  const header = (rows[headerIdx]||[]).map(normalizeForMatch);
   const findCol = (patterns)=> header.findIndex(h=>patterns.some(p=>h.includes(p)));
   const dateIdx = findCol(['data']);
   const descIdx = findCol(['descri','histor']);
   const valorIdx = findCol(['valor']);
   const tipoIdx = findCol(['tipo']);
-  const debitIdx = tipoIdx>=0 ? -1 : findCol(['debito','débito']);
-  const creditIdx = tipoIdx>=0 ? -1 : findCol(['credito','crédito']);
+  const debitIdx = tipoIdx>=0 ? -1 : findCol(['debito']);
+  const creditIdx = tipoIdx>=0 ? -1 : findCol(['credito']);
   const out = [];
   for(let i=headerIdx+1;i<rows.length;i++){
     const row = rows[i];
@@ -1196,6 +1237,7 @@ async function extractPDFText(typedArray){
 // Extração heurística: procura linhas que comecem com uma data e contenham valor(es) monetário(s).
 // Extratos em PDF variam muito de layout — por isso cada lançamento extraído vem para revisão manual.
 function parsePDFStatement(text){
+  text = fixMojibake(text);
   const lines = text.split(/\n+/).map(l=>l.trim()).filter(Boolean);
   const dateRe = /^(\d{2}\/\d{2}\/\d{4}|\d{2}\/\d{2}\/\d{2})\b\s*/;
   const moneyRe = /-?R?\$?\s?\d{1,3}(?:\.\d{3})*,\d{2}\s?-?/g;
