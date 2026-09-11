@@ -24,6 +24,7 @@
     --danger:#E53935;
     --danger-light:#FDECEA;
     --slate:#475569;
+    --slate-dark:#28313F;
     --slate-light:#EEF2F6;
     --ink:#F8F9FA;
     --panel:#FFFFFF;
@@ -95,6 +96,28 @@
   .hero-split.pessoal .value{color:var(--paper);}
   .hero-split .label{font-size:11px; display:flex; align-items:center; gap:6px; font-weight:600;}
   .hero-split .value{font-family:'Inter',sans-serif; font-size:22px; font-weight:700; margin-top:6px; letter-spacing:-0.02em;}
+
+  /* Resumo dos Saldos (tela inicial): hero por escopo + grade de contas */
+  .balhero{border-radius:18px; padding:18px 18px 16px; margin-bottom:12px; position:relative; overflow:hidden;}
+  .balhero.empresa{background:linear-gradient(135deg, var(--brand), var(--brand-dark));}
+  .balhero.pessoal{background:linear-gradient(135deg, var(--slate), var(--slate-dark));}
+  .balhero .bh-label{font-size:12px; font-weight:700; color:rgba(255,255,255,0.85); display:flex; align-items:center; gap:7px; letter-spacing:0.01em;}
+  .balhero .bh-label .dot{background:#fff;}
+  .balhero .bh-value{font-family:'Inter',sans-serif; font-size:27px; font-weight:800; color:#fff; margin-top:9px; letter-spacing:-0.02em;}
+  .balhero .bh-sub{font-size:11px; color:rgba(255,255,255,0.72); margin-top:6px;}
+
+  .acc-tile-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px;}
+  .acc-tile{background:var(--panel); border:1px solid var(--edge); border-radius:14px; padding:12px; border-top:3px solid var(--edge-strong); position:relative; transition:opacity .15s;}
+  .acc-tile.excluded{opacity:0.55;}
+  .acc-tile .at-top{display:flex; align-items:center; gap:8px; margin-bottom:10px; padding-right:20px;}
+  .acc-tile .at-name{font-size:12.5px; font-weight:700; color:var(--paper); line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .acc-tile .at-bank{font-size:10px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .acc-tile .at-val{font-family:'Inter',sans-serif; font-size:15.5px; font-weight:800; color:var(--paper);}
+  .acc-tile .at-toggle{position:absolute; top:11px; right:11px; cursor:pointer;}
+  .acc-tile .at-toggle input{width:16px; height:16px; accent-color:var(--slate); cursor:pointer; display:block;}
+  .acc-tile .at-flag{font-size:9.5px; margin-top:5px; font-weight:700;}
+  .acc-tile .at-flag.on{color:var(--brand-dark);}
+  .acc-tile .at-flag.off{color:var(--muted);}
 
   .scope-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;}
   .scope-col{display:flex; flex-direction:column; gap:8px;}
@@ -249,7 +272,8 @@
   .btn.ghost{background:transparent; color:var(--muted); border:1px solid var(--edge);}
 
   .hide-balances .val, .hide-balances .value, .hide-balances .acc-bal,
-  .hide-balances .tx-amt, .hide-balances .camt, .hide-balances .line b{
+  .hide-balances .tx-amt, .hide-balances .camt, .hide-balances .line b,
+  .hide-balances .bh-value, .hide-balances .at-val{
     filter: blur(7px); user-select:none;
   }
 </style>
@@ -318,7 +342,7 @@ const StorageProvider = {
 const CATS = {
   empresa: {
     entrada: [{k:'adesao', l:'Adesão'},{k:'comissao', l:'Comissão'},{k:'premiacao', l:'Premiação'},{k:'emprestimo', l:'Empréstimo'},{k:'outros', l:'Outros'}],
-    saida: [{k:'marketing', l:'Marketing'},{k:'transporte', l:'Transporte'},{k:'sistemas', l:'Sistemas'},{k:'impostos', l:'Impostos'},{k:'comissoes', l:'Comissões'},{k:'contabilidade', l:'Contabilidade'},{k:'emprestimos', l:'Empréstimos'},{k:'outros', l:'Outros'}]
+    saida: [{k:'marketing', l:'Marketing'},{k:'transporte', l:'Transporte'},{k:'alimentacao', l:'Alimentação'},{k:'sistemas', l:'Sistemas'},{k:'impostos', l:'Impostos'},{k:'comissoes', l:'Comissões'},{k:'contabilidade', l:'Contabilidade'},{k:'emprestimos', l:'Empréstimos'},{k:'outros', l:'Outros'}]
   },
   pessoal: {
     entrada: [{k:'prolabore', l:'Pró-labore'},{k:'salario', l:'Salário'},{k:'outros', l:'Outros'}],
@@ -422,7 +446,19 @@ function accountBalance(accId){
   state.transactions.forEach(t=>{ if(t.accountId===accId){ bal += (t.type==='entrada' ? Number(t.amount||0) : -Number(t.amount||0)); }});
   return bal;
 }
-function totalBalanceByType(type){ return state.accounts.filter(a => type==='pessoal' ? a.type==='pessoal' : a.type!=='pessoal').reduce((s,a)=>s+accountBalance(a.id),0); }
+function totalBalanceByType(type){
+  // Empresa: soma sempre todas as contas cadastradas. Pessoal: soma só as contas marcadas para entrar no total
+  // (includeInTotal !== false trata contas antigas, sem esse campo salvo ainda, como incluídas por padrão).
+  return state.accounts
+    .filter(a => type==='pessoal' ? a.type==='pessoal' : a.type!=='pessoal')
+    .filter(a => type==='pessoal' ? a.includeInTotal !== false : true)
+    .reduce((s,a)=>s+accountBalance(a.id),0);
+}
+function toggleAccountInclude(id){
+  const acc = state.accounts.find(a=>a.id===id); if(!acc) return;
+  acc.includeInTotal = !(acc.includeInTotal !== false);
+  saveAccounts(); render();
+}
 function catLabel(scope,type,key){ if(!CATS[scope] || !CATS[scope][type]) return key; const found = CATS[scope][type].find(c=>c.k===key); return found ? found.l : key; }
 
 function toggleBalances(){
@@ -530,6 +566,48 @@ function renderFlowInsights(list){
     <div class="card tips-card"><h4 style="margin-bottom:10px">Dicas para este fluxo</h4>${tips.map((tip,i)=>`<div class="tip"><span class="tip-mark">${i+1}</span><span>${tip}</span></div>`).join('')}</div>`;
 }
 
+function renderBalanceTile(a, scope){
+  const bank = bankById(a.bankId);
+  const included = a.includeInTotal !== false;
+  return `<div class="acc-tile ${scope==='pessoal' && !included ? 'excluded' : ''}" style="border-top-color:${bank.color}">
+    <div class="at-top">
+      ${bankBadgeHTML(a.bankId, 30, a.customBank)}
+      <div style="min-width:0;">
+        <div class="at-name">${escHtml(a.name)}</div>
+        <div class="at-bank">${escHtml(bankDisplayName(a))}</div>
+      </div>
+    </div>
+    <div class="at-val">${fmt(accountBalance(a.id))}</div>
+    ${scope==='pessoal' ? `
+      <label class="at-toggle" title="Somar no saldo total Pessoal">
+        <input type="checkbox" ${included?'checked':''} onchange="toggleAccountInclude('${a.id}')">
+      </label>
+      <div class="at-flag ${included?'on':'off'}">${included ? '✓ Soma no total' : 'Fora do total'}</div>
+    ` : ''}
+  </div>`;
+}
+function renderBalanceSummary(){
+  const empAccounts = state.accounts.filter(a=>a.type!=='pessoal');
+  const pesAccounts = state.accounts.filter(a=>a.type==='pessoal');
+  const nAcc = n => `${n} conta${n===1?'':'s'} cadastrada${n===1?'':'s'}`;
+  return `
+    <div class="section-title" style="margin-top:4px;">Resumo dos Saldos</div>
+    <div class="balhero empresa">
+      <div class="bh-label"><span class="dot"></span> Empresa</div>
+      <div class="bh-value">${fmt(totalBalanceByType('empresa'))}</div>
+      <div class="bh-sub">Saldo total · todas as contas · ${nAcc(empAccounts.length)}</div>
+    </div>
+    ${empAccounts.length ? `<div class="acc-tile-grid">${empAccounts.map(a=>renderBalanceTile(a,'empresa')).join('')}</div>` : `<div class="empty" style="padding:10px 4px 20px;">Nenhuma conta empresa cadastrada ainda.</div>`}
+
+    <div class="balhero pessoal">
+      <div class="bh-label"><span class="dot"></span> Pessoal</div>
+      <div class="bh-value">${fmt(totalBalanceByType('pessoal'))}</div>
+      <div class="bh-sub">Saldo total das contas marcadas · ${nAcc(pesAccounts.length)}</div>
+    </div>
+    ${pesAccounts.length ? `<div class="acc-tile-grid">${pesAccounts.map(a=>renderBalanceTile(a,'pessoal')).join('')}</div>` : `<div class="empty" style="padding:10px 4px 20px;">Nenhuma conta pessoal cadastrada ainda.</div>`}
+  `;
+}
+
 function renderDashboard(){
   const mt = monthTx();
   const empTx = mt.filter(t=>t.scope==='empresa');
@@ -541,10 +619,7 @@ function renderDashboard(){
       <div class="quick-action pessoal" onclick="openTxSheet('pessoal')"><div class="qa-icon">+</div><div><div class="qa-label">Lançamento</div><div class="qa-sub">Pessoal</div></div></div>
     </div>
     <button class="add-acc-btn" style="margin-top:-8px; margin-bottom:14px;" onclick="openImportSheet()">⇪ Importar extrato do banco (OFX/CSV)</button>
-    <div class="hero-row">
-      <div class="hero-split empresa"><div class="label"><span class="dot empresa"></span> Empresa</div><div class="value">${fmt(totalBalanceByType('empresa'))}</div></div>
-      <div class="hero-split pessoal"><div class="label"><span class="dot pessoal"></span> Pessoal</div><div class="value">${fmt(totalBalanceByType('pessoal'))}</div></div>
-    </div>
+    ${renderBalanceSummary()}
     <div class="section-title">Resumo do Mês</div>
     <div class="scope-grid">
       <div class="scope-col">
@@ -908,7 +983,7 @@ function deleteTx(id){
 let accDraft = null;
 function openAccountSheet(scope, id){
   const existing = id ? state.accounts.find(a=>a.id===id) : null;
-  accDraft = existing ? {...existing, isNew:false} : {id:uid(), type:scope, bankId:'nubank', customBank:'', name:'', initialBalance:'', isNew:true};
+  accDraft = existing ? {...existing, isNew:false} : {id:uid(), type:scope, bankId:'nubank', customBank:'', name:'', initialBalance:'', includeInTotal:true, isNew:true};
   renderAccountSheet();
 }
 function setAccBank(bankId){ accDraft.bankId = bankId; renderAccountSheet(); }
@@ -928,6 +1003,14 @@ function renderAccountSheet(){
     ${accDraft.bankId==='outro' ? `<div class="field"><label>Nome do banco</label><input type="text" maxlength="40" value="${escHtml(accDraft.customBank||'')}" oninput="accDraft.customBank=this.value" placeholder="Ex.: Banco XYZ"></div>` : ''}
     <div class="field"><label>Apelido da conta (opcional)</label><input type="text" maxlength="40" value="${escHtml(accDraft.name)}" oninput="accDraft.name=this.value" placeholder="Ex.: Conta corrente"></div>
     <div class="field"><label>Saldo inicial</label>${moneyInputHTML({value:accDraft.initialBalance, onInput:"maskMoneyInput(this, v=>accDraft.initialBalance=v)"})}</div>
+    ${accDraft.type==='pessoal' ? `
+    <div class="field">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" ${accDraft.includeInTotal!==false?'checked':''} onchange="accDraft.includeInTotal=this.checked" style="width:17px; height:17px; accent-color:var(--slate); cursor:pointer;">
+        <span>Somar esta conta no saldo total Pessoal</span>
+      </label>
+      <div style="font-size:11px; color:var(--muted); margin-top:4px;">Desmarque para uma conta cujo saldo você quer acompanhar, mas não incluir no total (ex.: reserva à parte).</div>
+    </div>` : ''}
     <div class="sheet-actions">
       <button class="btn ghost" onclick="closeSheet()">Cancelar</button>
       <button class="btn save" onclick="saveAccount()">Salvar</button>
@@ -943,7 +1026,8 @@ function saveAccount(){
     id: accDraft.id, type: accDraft.type, bankId: accDraft.bankId,
     customBank: accDraft.bankId==='outro' ? accDraft.customBank.trim() : '',
     name: (accDraft.name||'').trim() || displayName,
-    initialBalance: Number(accDraft.initialBalance)||0
+    initialBalance: Number(accDraft.initialBalance)||0,
+    includeInTotal: accDraft.type==='pessoal' ? (accDraft.includeInTotal!==false) : true
   };
   const idx = state.accounts.findIndex(a=>a.id===payload.id);
   if(idx>=0) state.accounts[idx] = payload; else state.accounts.push(payload);
@@ -962,7 +1046,7 @@ function guessCategory(scope, type, text){
   const rules = {
     empresa: {
       entrada: [[/adesao|adesão/,'adesao'],[/comiss/,'comissao'],[/premia/,'premiacao'],[/empr[eé]stimo/,'emprestimo']],
-      saida: [[/marketing|an[uú]ncio|\bads\b|facebook|google ads|instagram/,'marketing'],[/uber|99app|combust[ií]vel|transporte|estacionamento/,'transporte'],[/software|sistema|assinatura|saas|licen[cç]a/,'sistemas'],[/imposto|darf|\bdas\b|inss|fgts|\btaxa\b/,'impostos'],[/comiss/,'comissoes'],[/contab/,'contabilidade'],[/empr[eé]stimo/,'emprestimos']]
+      saida: [[/marketing|an[uú]ncio|\bads\b|facebook|google ads|instagram/,'marketing'],[/uber|99app|combust[ií]vel|transporte|estacionamento/,'transporte'],[/ifood|restaurante|lanche|padaria|supermercado|\bmercado\b|alimenta/,'alimentacao'],[/software|sistema|assinatura|saas|licen[cç]a/,'sistemas'],[/imposto|darf|\bdas\b|inss|fgts|\btaxa\b/,'impostos'],[/comiss/,'comissoes'],[/contab/,'contabilidade'],[/empr[eé]stimo/,'emprestimos']]
     },
     pessoal: {
       entrada: [[/pr[oó].?labore/,'prolabore'],[/sal[aá]rio/,'salario']],
