@@ -389,6 +389,15 @@ function maskMoneyInput(el, setter){
   el.value = `${intFormatted},${cents}`;
   setter(parseFloat(`${intPart}.${cents}`));
 }
+// Campo de valor com "R$" fixo à esquerda (fora do texto editável) e o restante mascarado em tempo real.
+function moneyInputHTML(opts){
+  const { id='', value=0, onInput='', height=48, fontSize=14, wrapperStyle='' } = opts;
+  const big = height >= 44;
+  return `<div style="display:flex; align-items:stretch; border:1px solid var(--edge); border-radius:${big?12:8}px; overflow:hidden; background:#F9FAFB; ${wrapperStyle}">
+    <span style="display:flex; align-items:center; padding:0 ${big?10:8}px; font-weight:700; color:var(--muted); font-size:${Math.max(11,fontSize-1)}px; border-right:1px solid var(--edge); background:#F1F3F5; flex-shrink:0;">R$</span>
+    <input type="text" inputmode="numeric" ${id?`id="${id}"`:''} value="${moneyMaskValue(value)}" oninput="${onInput}" placeholder="0,00" style="border:none; background:transparent; flex:1; min-width:0; min-height:${height}px; padding:6px 8px; font-family:'Inter',sans-serif; font-size:${fontSize}px; color:var(--paper); outline:none;">
+  </div>`;
+}
 function todayISO(){ const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
 
@@ -640,7 +649,7 @@ function renderRecurringSheet(){
     <div class="toggle-row"><button class="toggle-opt ${recurringDraft.type==='entrada'?'sel-in':''}" onclick="setRecurringType('entrada')">Entrada</button><button class="toggle-opt ${recurringDraft.type==='saida'?'sel-out':''}" onclick="setRecurringType('saida')">Saída</button></div>
     <div class="field"><label>Nome da conta</label><input type="text" maxlength="60" value="${escHtml(recurringDraft.name)}" oninput="recurringDraft.name=this.value" placeholder="Ex.: Aluguel do escritório"></div>
     <div class="field"><label>Categoria</label><select onchange="recurringDraft.category=this.value">${cats.map(c=>`<option value="${c.k}" ${c.k===recurringDraft.category?'selected':''}>${c.l}</option>`).join('')}</select></div>
-    <div class="field"><label>Valor (R$)</label><input type="text" inputmode="numeric" value="${moneyMaskValue(recurringDraft.amount)}" oninput="maskMoneyInput(this, v=>recurringDraft.amount=v)" placeholder="0,00"></div>
+    <div class="field"><label>Valor</label>${moneyInputHTML({value:recurringDraft.amount, onInput:"maskMoneyInput(this, v=>recurringDraft.amount=v)"})}</div>
     <div class="grid-2" style="margin-bottom:0"><div class="field"><label>Vencimento (dia)</label><input type="number" min="1" max="31" value="${recurringDraft.dueDay}" oninput="recurringDraft.dueDay=this.value" placeholder="Ex.: 10"></div><div class="field"><label>Frequência</label><select onchange="recurringDraft.frequency=this.value"><option value="monthly" ${recurringDraft.frequency==='monthly'?'selected':''}>Mensal</option><option value="annual" ${recurringDraft.frequency==='annual'?'selected':''}>Anual</option></select></div></div>
     <div class="field"><label>Observação (opcional)</label><input type="text" maxlength="80" value="${escHtml(recurringDraft.description)}" oninput="recurringDraft.description=this.value" placeholder="Ex.: contrato renovável"></div>
     <div class="sheet-actions"><button class="btn ghost" onclick="closeSheet()">Cancelar</button><button class="btn save" onclick="saveRecurringItem()">Salvar</button></div>`;
@@ -869,7 +878,7 @@ function renderTxSheet(){
       <button class="toggle-opt ${txDraft.type==='saida'?'sel-out':''}" onclick="setTxType('saida')">Saída</button>
     </div>
     <div class="field"><label>Categoria</label><select onchange="setTxCategory(this.value)">${cats.map(c=>`<option value="${c.k}" ${c.k===txDraft.category?'selected':''}>${c.l}</option>`).join('')}</select></div>
-    <div class="field"><label>Valor (R$)</label><input type="text" inputmode="numeric" id="tx-amt" value="${moneyMaskValue(txDraft.amount)}" oninput="maskMoneyInput(this, v=>txDraft.amount=v)" placeholder="0,00"></div>
+    <div class="field"><label>Valor</label>${moneyInputHTML({id:'tx-amt', value:txDraft.amount, onInput:"maskMoneyInput(this, v=>txDraft.amount=v)"})}</div>
     <div class="field"><label>Data</label><input type="date" value="${txDraft.date}" onchange="txDraft.date=this.value"></div>
     <div class="field"><label>Descrição (opcional)</label><input type="text" maxlength="80" value="${escHtml(txDraft.description)}" oninput="txDraft.description=this.value" placeholder="Ex.: Uber para reunião"></div>
     <div class="field"><label>Conta (opcional)</label><select onchange="txDraft.accountId=this.value"><option value="">Sem conta vinculada</option>${accounts.map(a=>`<option value="${a.id}" ${a.id===txDraft.accountId?'selected':''}>${escHtml(a.name)}</option>`).join('')}</select></div>
@@ -918,7 +927,7 @@ function renderAccountSheet(){
     </div>
     ${accDraft.bankId==='outro' ? `<div class="field"><label>Nome do banco</label><input type="text" maxlength="40" value="${escHtml(accDraft.customBank||'')}" oninput="accDraft.customBank=this.value" placeholder="Ex.: Banco XYZ"></div>` : ''}
     <div class="field"><label>Apelido da conta (opcional)</label><input type="text" maxlength="40" value="${escHtml(accDraft.name)}" oninput="accDraft.name=this.value" placeholder="Ex.: Conta corrente"></div>
-    <div class="field"><label>Saldo inicial (R$)</label><input type="text" inputmode="numeric" value="${moneyMaskValue(accDraft.initialBalance)}" oninput="maskMoneyInput(this, v=>accDraft.initialBalance=v)" placeholder="0,00"></div>
+    <div class="field"><label>Saldo inicial</label>${moneyInputHTML({value:accDraft.initialBalance, onInput:"maskMoneyInput(this, v=>accDraft.initialBalance=v)"})}</div>
     <div class="sheet-actions">
       <button class="btn ghost" onclick="closeSheet()">Cancelar</button>
       <button class="btn save" onclick="saveAccount()">Salvar</button>
@@ -1003,8 +1012,15 @@ function parseOFX(text){
   return rows;
 }
 function detectDelimiter(line){
-  const counts = {',':(line.match(/,/g)||[]).length, ';':(line.match(/;/g)||[]).length, '\t':(line.match(/\t/g)||[]).length};
-  return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+  // Extratos brasileiros usam vírgula como separador decimal (ex.: "150,00"), então contar
+  // vírgulas para decidir o delimitador confunde valor com coluna. Preferimos ";" sempre que
+  // ele aparecer, e só usamos "," como delimitador quando não há ";" nem tab na linha.
+  const semicolonCount = (line.match(/;/g)||[]).length;
+  const tabCount = (line.match(/\t/g)||[]).length;
+  const commaCount = (line.match(/,/g)||[]).length;
+  if(semicolonCount > 0 && semicolonCount >= tabCount) return ';';
+  if(tabCount > 0) return '\t';
+  return commaCount > 0 ? ',' : ';';
 }
 function splitCSVLine(line, delim){
   const result = []; let cur='', inQuotes=false;
@@ -1022,9 +1038,11 @@ function parseCSV(text){
   if(!lines.length) return [];
   const delim = detectDelimiter(lines[0]);
   const header = splitCSVLine(lines[0], delim).map(h=>h.toLowerCase());
-  const findCol = (patterns)=> header.findIndex(h=>patterns.some(p=>h.includes(p)));
+  // documento/número de referência nunca deve ser confundido com data, descrição ou valor
+  const docCols = header.map((h,idx)=> (h.includes('documento') || h.includes('núm') || h.includes('num.') || h.includes('referência') || h.includes('referencia')) ? idx : -1).filter(idx=>idx>=0);
+  const findCol = (patterns, exclude=[])=> header.findIndex((h,idx)=> !exclude.includes(idx) && !docCols.includes(idx) && patterns.some(p=>h.includes(p)));
   let dateIdx = findCol(['data','date']);
-  let descIdx = findCol(['histor','descri','memo','lancamento','lançamento','detalhe']);
+  let descIdx = findCol(['histor','descri','memo','lancamento','lançamento','detalhe'], [dateIdx]);
   let amountIdx = findCol(['valor','amount','montante']);
   let debitIdx = findCol(['debito','débito','saida','saída']);
   let creditIdx = findCol(['credito','crédito','entrada']);
@@ -1047,6 +1065,83 @@ function parseCSV(text){
     if(date && amount!==undefined && !isNaN(amount) && amount !== 0) rows.push({date, description: description || 'Transação importada', amount});
   }
   return rows;
+}
+
+/* ===== Leitura de extrato em Excel/.xlsx (via SheetJS, carregado sob demanda) ===== */
+const XLSXJS_VERSION = '0.18.5';
+let xlsxLoadPromise = null;
+function ensureXlsxLoaded(){
+  if(window.XLSX) return Promise.resolve();
+  if(xlsxLoadPromise) return xlsxLoadPromise;
+  xlsxLoadPromise = new Promise((resolve, reject)=>{
+    const script = document.createElement('script');
+    script.src = `https://cdnjs.cloudflare.com/ajax/libs/xlsx/${XLSXJS_VERSION}/xlsx.full.min.js`;
+    script.onload = () => {
+      if(window.XLSX) resolve();
+      else { xlsxLoadPromise = null; reject(new Error('Leitor de planilha indisponível.')); }
+    };
+    script.onerror = () => { xlsxLoadPromise = null; reject(new Error('Não foi possível carregar o leitor de planilha. Verifique sua internet.')); };
+    document.head.appendChild(script);
+  });
+  return xlsxLoadPromise;
+}
+function extractXLSXRows(arrayBuffer){
+  const wb = window.XLSX.read(arrayBuffer, { type: 'array' });
+  let allRows = [];
+  wb.SheetNames.forEach(name=>{
+    const rows = window.XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null, raw: false });
+    allRows = allRows.concat(rows);
+  });
+  return allRows;
+}
+// Extratos em .xlsx costumam ter linhas de título/dados da empresa antes da tabela real —
+// por isso procuramos a linha de cabeçalho em vez de assumir que é a primeira linha.
+function findXLSXHeaderRow(rows){
+  for(let i=0;i<rows.length;i++){
+    const row = (rows[i]||[]).map(c=> (c==null?'':String(c)).toLowerCase());
+    const hasDate = row.some(c=>c.includes('data'));
+    const hasValor = row.some(c=>c.includes('valor'));
+    const hasDesc = row.some(c=>c.includes('descri') || c.includes('histor'));
+    if(hasDate && hasValor && hasDesc) return i;
+  }
+  return -1;
+}
+function parseXLSXStatement(rows){
+  const headerIdx = findXLSXHeaderRow(rows);
+  if(headerIdx < 0) return [];
+  const header = (rows[headerIdx]||[]).map(c=> (c==null?'':String(c)).toLowerCase());
+  const findCol = (patterns)=> header.findIndex(h=>patterns.some(p=>h.includes(p)));
+  const dateIdx = findCol(['data']);
+  const descIdx = findCol(['descri','histor']);
+  const valorIdx = findCol(['valor']);
+  const tipoIdx = findCol(['tipo']);
+  const debitIdx = tipoIdx>=0 ? -1 : findCol(['debito','débito']);
+  const creditIdx = tipoIdx>=0 ? -1 : findCol(['credito','crédito']);
+  const out = [];
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const row = rows[i];
+    if(!row || dateIdx<0 || row[dateIdx]==null || String(row[dateIdx]).trim()==='') continue; // pula "Saldo do Dia", rodapé etc.
+    const date = parseBRDate(String(row[dateIdx]));
+    if(!date) continue;
+    let amount;
+    if(valorIdx>=0 && row[valorIdx]!=null && String(row[valorIdx]).trim()!==''){
+      amount = parseAmountStr(row[valorIdx]);
+    } else if(debitIdx>=0 || creditIdx>=0){
+      const c = creditIdx>=0 && row[creditIdx]!=null ? parseAmountStr(row[creditIdx]) : NaN;
+      const d = debitIdx>=0 && row[debitIdx]!=null ? parseAmountStr(row[debitIdx]) : NaN;
+      if(!isNaN(c) && c!==0) amount = Math.abs(c); else if(!isNaN(d) && d!==0) amount = -Math.abs(d);
+    }
+    if(amount===undefined || isNaN(amount) || amount===0) continue;
+    // a coluna "Tipo" (Débito/Crédito), quando existe, é a referência mais confiável de sinal
+    if(tipoIdx>=0 && row[tipoIdx]){
+      const tipo = String(row[tipoIdx]).toLowerCase();
+      if(tipo.includes('déb') || tipo.includes('deb')) amount = -Math.abs(amount);
+      else if(tipo.includes('créd') || tipo.includes('cred')) amount = Math.abs(amount);
+    }
+    const description = descIdx>=0 && row[descIdx]!=null && String(row[descIdx]).trim()!=='' ? String(row[descIdx]).trim() : 'Transação importada';
+    out.push({ date, description, amount });
+  }
+  return out;
 }
 
 /* ===== Leitura de extrato em PDF (via PDF.js, carregado sob demanda) ===== */
@@ -1142,7 +1237,7 @@ function renderImportStep1(){
   const accounts = state.accounts.filter(a=> importDraft.scope==='pessoal' ? a.type==='pessoal' : a.type!=='pessoal');
   const html = `
     <h3>Importar extrato bancário</h3>
-    <p class="hint" style="font-size:12px;color:var(--muted);line-height:1.5;margin:-8px 0 16px">Envie o extrato exportado do seu banco em formato <b>OFX</b> (recomendado), <b>CSV</b> ou <b>PDF</b>. Você vai revisar cada lançamento antes de confirmar — nada é importado automaticamente.<br><br>A leitura de PDF é experimental: funciona só com PDFs gerados digitalmente pelo banco (não fotos ou digitalizações) e a primeira vez que você usar essa opção precisa de internet para carregar o leitor.</p>
+    <p class="hint" style="font-size:12px;color:var(--muted);line-height:1.5;margin:-8px 0 16px">Envie o extrato exportado do seu banco em formato <b>OFX</b> (recomendado), <b>CSV</b>, <b>Excel (.xlsx)</b> ou <b>PDF</b>. Você vai revisar cada lançamento antes de confirmar — nada é importado automaticamente.<br><br>A leitura de PDF é experimental: funciona só com PDFs gerados digitalmente pelo banco (não fotos ou digitalizações). PDF e Excel precisam de internet na primeira vez, para carregar o leitor.</p>
     <div class="toggle-row">
       <button class="toggle-opt ${importDraft.scope==='empresa'?'sel-in':''}" onclick="setImportScope('empresa')">Empresa</button>
       <button class="toggle-opt ${importDraft.scope==='pessoal'?'sel-pessoal':''}" onclick="setImportScope('pessoal')">Pessoal</button>
@@ -1151,8 +1246,8 @@ function renderImportStep1(){
       <option value="">Sem conta vinculada</option>
       ${accounts.map(a=>`<option value="${a.id}" ${a.id===importDraft.accountId?'selected':''}>${escHtml(a.name)}</option>`).join('')}
     </select></div>
-    <div class="field"><label>Arquivo do extrato (.ofx, .csv ou .pdf)</label>
-      <input type="file" accept=".ofx,.csv,text/csv,application/x-ofx,.pdf,application/pdf" onchange="handleImportFile(event)">
+    <div class="field"><label>Arquivo do extrato (.ofx, .csv, .xlsx ou .pdf)</label>
+      <input type="file" accept=".ofx,.csv,text/csv,application/x-ofx,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,.pdf,application/pdf" onchange="handleImportFile(event)">
     </div>
     <div id="import-file-status" style="font-size:12px;color:var(--muted);margin:-6px 0 4px;"></div>
     <div class="sheet-actions"><button class="btn ghost" onclick="closeSheet()">Cancelar</button></div>
@@ -1175,6 +1270,32 @@ function handleImportFile(evt){
   importDraft.fileName = file.name;
   const status = document.getElementById('import-file-status');
   const isPDF = /\.pdf$/i.test(file.name) || file.type==='application/pdf';
+  const isXLSX = /\.xlsx?$/i.test(file.name) || /spreadsheetml|ms-excel/i.test(file.type||'');
+
+  if(isXLSX){
+    if(status) status.textContent = 'Carregando leitor de planilha (é necessário internet na primeira vez)...';
+    ensureXlsxLoaded().then(()=>{
+      if(status) status.textContent = 'Lendo planilha...';
+      const reader = new FileReader();
+      reader.onload = () => {
+        try{
+          const rows = extractXLSXRows(reader.result);
+          const parsed = parseXLSXStatement(rows);
+          if(!parsed.length){
+            if(status) status.textContent = 'Não encontramos uma tabela de lançamentos reconhecível nesta planilha (procuramos colunas de Data, Descrição e Valor).';
+            return;
+          }
+          finishParsedImport(parsed, status);
+        }catch(e){
+          if(status) status.textContent = 'Não foi possível ler esta planilha. Tente exportar como CSV ou OFX.';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }).catch(err=>{
+      if(status) status.textContent = (err && err.message) || 'Não foi possível carregar o leitor de planilha. Verifique sua internet ou use OFX/CSV.';
+    });
+    return;
+  }
 
   if(isPDF){
     if(status) status.textContent = 'Carregando leitor de PDF (é necessário internet na primeira vez)...';
@@ -1238,7 +1359,7 @@ function renderImportPreview(){
               <select onchange="importDraft.rows[${i}].category=this.value" style="flex:1; min-height:36px; padding:6px 8px; font-size:11.5px; border:1px solid var(--edge); border-radius:8px; background:#F9FAFB;">
                 ${CATS[importDraft.scope][r.type].map(c=>`<option value="${c.k}" ${c.k===r.category?'selected':''}>${c.l}</option>`).join('')}
               </select>
-              <input type="text" inputmode="numeric" value="${moneyMaskValue(r.amount)}" oninput="maskMoneyInput(this, v=>importDraft.rows[${i}].amount=v)" style="width:96px; min-height:36px; padding:6px 8px; font-size:11.5px; border:1px solid var(--edge); border-radius:8px; background:#F9FAFB;">
+              ${moneyInputHTML({value:r.amount, onInput:`maskMoneyInput(this, v=>importDraft.rows[${i}].amount=v)`, height:36, fontSize:11.5, wrapperStyle:'width:118px; flex-shrink:0;'})}
             </div>
             ${r.dup ? '<div style="font-size:10px;color:var(--danger);margin-top:5px;">Possível duplicado — já existe um lançamento parecido</div>' : ''}
             ${r.uncertain ? '<div style="font-size:10px;color:#B26A00;margin-top:5px;">Não identificamos com certeza se é entrada ou saída neste PDF — confira o tipo acima</div>' : ''}
