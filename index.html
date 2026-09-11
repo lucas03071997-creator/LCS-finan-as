@@ -317,12 +317,12 @@ const StorageProvider = {
 
 const CATS = {
   empresa: {
-    entrada: [{k:'adesao', l:'Adesão'},{k:'premiacao', l:'Premiação'},{k:'comissao', l:'Comissão'},{k:'vendas', l:'Vendas'},{k:'servicos', l:'Prestação de serviços'},{k:'recebimento', l:'Recebimento de cliente'},{k:'aporte', l:'Aporte dos sócios'},{k:'outras_entradas', l:'Outras entradas'}],
-    saida: [{k:'investimento', l:'Investimentos'},{k:'anuncios', l:'Anúncios e publicidade'},{k:'aluguel', l:'Aluguel / estrutura'},{k:'folha', l:'Folha de pagamento'},{k:'fornecedores', l:'Fornecedores'},{k:'impostos', l:'Impostos e taxas'},{k:'equipamentos', l:'Equipamentos'},{k:'software', l:'Software e ferramentas'},{k:'transporte_empresa', l:'Transporte'},{k:'servicos_terceiros', l:'Serviços de terceiros'},{k:'tarifas', l:'Tarifas bancárias'},{k:'outras_saidas', l:'Outras saídas'}]
+    entrada: [{k:'adesao', l:'Adesão'},{k:'comissao', l:'Comissão'},{k:'premiacao', l:'Premiação'},{k:'emprestimo', l:'Empréstimo'},{k:'outros', l:'Outros'}],
+    saida: [{k:'marketing', l:'Marketing'},{k:'transporte', l:'Transporte'},{k:'sistemas', l:'Sistemas'},{k:'impostos', l:'Impostos'},{k:'comissoes', l:'Comissões'},{k:'contabilidade', l:'Contabilidade'},{k:'emprestimos', l:'Empréstimos'},{k:'outros', l:'Outros'}]
   },
   pessoal: {
-    entrada: [{k:'prolabore', l:'Pró-labore'},{k:'salario', l:'Salário'},{k:'emprestimo', l:'Empréstimo recebido'},{k:'presente', l:'Presente ou ajuda'},{k:'rendimento', l:'Rendimentos'},{k:'reembolso', l:'Reembolso'},{k:'outras_entradas', l:'Outras entradas pessoais'}],
-    saida: [{k:'moradia', l:'Moradia'},{k:'alimentacao', l:'Alimentação'},{k:'supermercado', l:'Supermercado'},{k:'transporte', l:'Transporte / Uber'},{k:'saude', l:'Saúde'},{k:'educacao', l:'Educação'},{k:'lazer', l:'Lazer'},{k:'familia', l:'Família e filhos'},{k:'vestuario', l:'Vestuário'},{k:'contas', l:'Contas e assinaturas'},{k:'emprestimo_pagamento', l:'Pagamento de empréstimo'},{k:'cartao', l:'Cartão de crédito'},{k:'outras_saidas', l:'Outras saídas pessoais'}]
+    entrada: [{k:'prolabore', l:'Pró-labore'},{k:'salario', l:'Salário'},{k:'outros', l:'Outros'}],
+    saida: [{k:'dizimo', l:'Dízimo'},{k:'moradia', l:'Moradia'},{k:'alimentacao', l:'Alimentação'},{k:'ifood', l:'iFood'},{k:'contas', l:'Contas (água, luz, internet)'},{k:'transporte', l:'Transporte'},{k:'saude', l:'Saúde'},{k:'educacao', l:'Educação'},{k:'consorcio', l:'Consórcio'},{k:'cartao_credito', l:'Cartão de crédito'},{k:'lazer', l:'Lazer'},{k:'compras', l:'Compras'},{k:'emprestimos', l:'Empréstimos'},{k:'investimentos', l:'Investimentos'},{k:'outros', l:'Outros'}]
   }
 };
 
@@ -961,17 +961,17 @@ function guessCategory(scope, type, text){
   const t = (text||'').toLowerCase();
   const rules = {
     empresa: {
-      entrada: [[/adesao|adesão/,'adesao'],[/premia/,'premiacao'],[/comiss/,'comissao'],[/venda/,'vendas'],[/servi[cç]o/,'servicos'],[/cliente|receb/,'recebimento'],[/aporte|s[oó]cio/,'aporte']],
-      saida: [[/invest/,'investimento'],[/an[uú]ncio|\bads\b|facebook|google ads|instagram/,'anuncios'],[/aluguel|condom[ií]nio/,'aluguel'],[/folha|sal[aá]rio.*func|pagamento.*func/,'folha'],[/fornecedor/,'fornecedores'],[/imposto|darf|\bdas\b|inss|fgts|\btaxa\b/,'impostos'],[/equipamento|notebook|computador/,'equipamentos'],[/software|assinatura|saas|licen[cç]a/,'software'],[/uber|99app|combust[ií]vel|transporte|estacionamento/,'transporte_empresa'],[/consultoria|terceiriz/,'servicos_terceiros'],[/tarifa|manuten[cç][aã]o.*conta/,'tarifas']]
+      entrada: [[/adesao|adesão/,'adesao'],[/comiss/,'comissao'],[/premia/,'premiacao'],[/empr[eé]stimo/,'emprestimo']],
+      saida: [[/marketing|an[uú]ncio|\bads\b|facebook|google ads|instagram/,'marketing'],[/uber|99app|combust[ií]vel|transporte|estacionamento/,'transporte'],[/software|sistema|assinatura|saas|licen[cç]a/,'sistemas'],[/imposto|darf|\bdas\b|inss|fgts|\btaxa\b/,'impostos'],[/comiss/,'comissoes'],[/contab/,'contabilidade'],[/empr[eé]stimo/,'emprestimos']]
     },
     pessoal: {
-      entrada: [[/pr[oó].?labore/,'prolabore'],[/sal[aá]rio/,'salario'],[/empr[eé]stimo/,'emprestimo'],[/presente|ajuda/,'presente'],[/rendimento|dividendo|\bjuros\b/,'rendimento'],[/reembolso/,'reembolso']],
-      saida: [[/aluguel|condom[ií]nio|financiamento.*(casa|imovel|imóvel)|\biptu\b/,'moradia'],[/restaurante|ifood|lanche|padaria/,'alimentacao'],[/supermercado|\bmercado\b|hortifruti/,'supermercado'],[/uber|99app|combust[ií]vel|transporte|estacionamento|[oô]nibus/,'transporte'],[/farm[aá]cia|hospital|m[eé]dic|plano de sa[uú]de|dentista/,'saude'],[/escola|faculdade|\bcurso\b|mensalidade/,'educacao'],[/cinema|streaming|netflix|spotify|\bshow\b|viagem/,'lazer'],[/\bfilho\b|creche|escola infantil/,'familia'],[/\bloja\b|roupa|cal[cç]ado/,'vestuario'],[/energia|\b[aá]gua\b|internet|telefone|assinatura/,'contas'],[/empr[eé]stimo/,'emprestimo_pagamento'],[/cart[aã]o de cr[eé]dito|\bfatura\b/,'cartao']]
+      entrada: [[/pr[oó].?labore/,'prolabore'],[/sal[aá]rio/,'salario']],
+      saida: [[/d[ií]zimo/,'dizimo'],[/aluguel|condom[ií]nio|financiamento.*(casa|imovel|imóvel)|\biptu\b/,'moradia'],[/ifood/,'ifood'],[/restaurante|lanche|padaria|supermercado|\bmercado\b|hortifruti|alimenta/,'alimentacao'],[/energia|\b[aá]gua\b|internet|telefone|\bluz\b/,'contas'],[/uber|99app|combust[ií]vel|transporte|estacionamento|[oô]nibus/,'transporte'],[/farm[aá]cia|hospital|m[eé]dic|plano de sa[uú]de|dentista/,'saude'],[/escola|faculdade|\bcurso\b|mensalidade/,'educacao'],[/cons[oó]rcio/,'consorcio'],[/cart[aã]o de cr[eé]dito|\bfatura\b/,'cartao_credito'],[/cinema|streaming|netflix|spotify|\bshow\b|viagem|lazer/,'lazer'],[/\bloja\b|roupa|cal[cç]ado|\bcompra/,'compras'],[/empr[eé]stimo/,'emprestimos'],[/invest/,'investimentos']]
     }
   };
   const list = (rules[scope] && rules[scope][type]) || [];
   for(const [re,key] of list){ if(re.test(t)) return key; }
-  return type==='entrada' ? 'outras_entradas' : 'outras_saidas';
+  return 'outros';
 }
 function parseBRDate(str){
   if(!str) return '';
@@ -1294,7 +1294,7 @@ function renderImportStep1(){
     <div class="field"><label>Arquivo do extrato (.ofx, .csv, .xlsx ou .pdf)</label>
       <input type="file" accept=".ofx,.csv,text/csv,application/x-ofx,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,.pdf,application/pdf" onchange="handleImportFile(event)">
     </div>
-    <div id="import-file-status" style="font-size:12px;color:var(--muted);margin:-6px 0 4px;"></div>
+    <div id="import-file-status" style="font-size:12px;color:var(--muted);margin:-6px 0 4px;white-space:pre-wrap;word-break:break-word;"></div>
     <div class="sheet-actions"><button class="btn ghost" onclick="closeSheet()">Cancelar</button></div>
   `;
   openSheetHTML(html);
@@ -1327,7 +1327,11 @@ function handleImportFile(evt){
           const rows = extractXLSXRows(reader.result);
           const parsed = parseXLSXStatement(rows);
           if(!parsed.length){
-            if(status) status.textContent = 'Não encontramos uma tabela de lançamentos reconhecível nesta planilha (procuramos colunas de Data, Descrição e Valor).';
+            // Mostra uma prévia das primeiras linhas lidas para ajudar a diagnosticar
+            // por que o cabeçalho não foi reconhecido (planilhas variam muito de banco pra banco).
+            const preview = rows.filter(r=>r && r.some(c=>c!=null && String(c).trim()!=='')).slice(0,6)
+              .map(r=> '[' + r.map(c=> c==null?'':String(c)).join(' | ') + ']').join('\n');
+            if(status) status.textContent = 'Não encontramos uma tabela de lançamentos reconhecível nesta planilha (procuramos colunas de Data, Descrição e Valor).\n\nPrévia do que foi lido:\n' + preview;
             return;
           }
           finishParsedImport(parsed, status);
